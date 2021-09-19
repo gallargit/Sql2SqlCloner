@@ -1,5 +1,4 @@
 # Sql2SqlCloner
-
 SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject.com/Articles/994806/SQL-Server-Database-Cloning-Tool-using-Csharp)
 
 # Features
@@ -24,7 +23,6 @@ SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject
   * No DLLs, nuget packages are used instead. WARNING: Do not try to update them to the latest version as that will break the application
 
 # How to use
-
 Run the application, select the source and destination connections and click OK. It's usually a good idea copying to an empty database.
 
 You can select a number of options in the screens, tables can be right-clicked so you can specify some additional options there.
@@ -37,4 +35,3 @@ In the `app.config` file some objects are included to demonstrate how to paramet
 # To be done
 * Ability to decrypt encrypted objects using DAC connection
 * Copy Azure databases using Azure Multi Factor Authentication as seen [here](https://stackoverflow.com/questions/60564462/how-to-connect-to-a-database-using-active-directory-login-and-multifactor-authen)
-* 
