@@ -1,7 +1,7 @@
 ﻿using Microsoft.SqlServer.Management.Smo;
 using System.Drawing;
 
-namespace Sql2SqlCloner.Core.Schema
+namespace Sql2SqlCloner.Core.SchemaTransfer
 {
     public class SqlSchemaObject
     {

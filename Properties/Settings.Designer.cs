@@ -12,7 +12,7 @@ namespace Sql2SqlCloner.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.0.3.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "16.10.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -133,10 +133,10 @@ namespace Sql2SqlCloner.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int CopyCollation {
+        [global::System.Configuration.DefaultSettingValueAttribute("Ignore")]
+        public global::Sql2SqlCloner.Core.DataTransfer.SqlCollationAction CopyCollation {
             get {
-                return ((int)(this["CopyCollation"]));
+                return ((global::Sql2SqlCloner.Core.DataTransfer.SqlCollationAction)(this["CopyCollation"]));
             }
             set {
                 this["CopyCollation"] = value;

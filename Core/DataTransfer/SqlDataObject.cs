@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
 
-namespace Sql2SqlCloner.Core.Data
+namespace Sql2SqlCloner.Core.DataTransfer
 {
     public class SqlDataObject
     {

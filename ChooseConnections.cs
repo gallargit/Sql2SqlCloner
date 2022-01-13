@@ -1,6 +1,6 @@
 ﻿using Microsoft.Data.ConnectionUI;
-using Sql2SqlCloner.Core.Data;
-using Sql2SqlCloner.Core.Schema;
+using Sql2SqlCloner.Core.DataTransfer;
+using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -128,7 +128,7 @@ namespace Sql2SqlCloner
 
             var firststepok = false;
             var successConnecting = true;
-            SqlSchemaTransfer transferSchema = null;
+            SqlSchemaTransfer schematransfer = null;
             List<SqlSchemaObject> tablesToCopy = null;
             try
             {
@@ -141,17 +141,17 @@ namespace Sql2SqlCloner
                 if (tskPreload != null && strtskSource == txtSource.Text && strtskDestination == txtDestination.Text)
                 {
                     tskPreload.Wait();
-                    transferSchema = tskPreload.Result;
+                    schematransfer = tskPreload.Result;
                 }
                 else
                 {
                     AbortBackgroundTask();
                     token = new CancellationToken();
-                    transferSchema = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token);
+                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token);
                 }
                 tskPreload = null;
 
-                if (transferSchema.SameDatabase &&
+                if (schematransfer.SameDatabase &&
                     MessageBox.Show("Source and destination databases are the same, do you want to continue?", "Warning",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
                 {
@@ -185,11 +185,11 @@ namespace Sql2SqlCloner
                 tskPreload = null;
                 return;
             }
-            if (transferSchema.SourceObjects?.Count > 0)
+            if (schematransfer.SourceObjects?.Count > 0)
             {
                 firststepok = false;
-                var next = new ChooseSchemas(transferSchema, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked);
-                var resultdiag = next.ShowDialog();
+                var chooseSchema = new ChooseSchemas(schematransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked);
+                var resultdiag = chooseSchema.ShowDialog();
                 if (resultdiag == DialogResult.Abort || resultdiag == DialogResult.Cancel)
                 {
                     Environment.Exit(0);
@@ -198,9 +198,9 @@ namespace Sql2SqlCloner
                 else if (resultdiag == DialogResult.OK)
                 {
                     firststepok = true;
-                    if (next.SelectedObjects != null)
+                    if (chooseSchema.SelectedObjects != null)
                     {
-                        tablesToCopy = next.SelectedObjects.ToList();
+                        tablesToCopy = chooseSchema.SelectedObjects.ToList();
                     }
                     else
                     {
@@ -217,11 +217,11 @@ namespace Sql2SqlCloner
             }
             if (isData.Checked)
             {
-                SqlDataTransfer transfer;
+                SqlDataTransfer datatransfer;
                 List<SqlDataObject> itemsToCopy;
                 try
                 {
-                    transfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer);
+                    datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer);
                     itemsToCopy = new List<SqlDataObject>();
                     if (tablesToCopy != null)
                     {
@@ -250,8 +250,12 @@ namespace Sql2SqlCloner
 
                 if (itemsToCopy.Count > 0)
                 {
-                    var next = new CopyTabledata(itemsToCopy, transfer, firststepok);
-                    next.ShowDialog();
+                    var copyTableData = new CopyTabledata(itemsToCopy, datatransfer, schematransfer, firststepok,
+                        Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation)
+                    {
+                        Visible = false
+                    };
+                    copyTableData.ShowDialog();
                     Environment.Exit(0);
                     return;
                 }

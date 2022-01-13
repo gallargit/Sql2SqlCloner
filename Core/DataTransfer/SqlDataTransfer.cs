@@ -7,7 +7,7 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Windows.Forms;
 
-namespace Sql2SqlCloner.Core.Data
+namespace Sql2SqlCloner.Core.DataTransfer
 {
     public class SqlDataTransfer : SqlTransfer
     {
@@ -60,32 +60,32 @@ namespace Sql2SqlCloner.Core.Data
                     if (incompliantDataDeletion != "true" && incompliantDataDeletion != "false")
                     {
                         incompliantDataDeletion = MessageBox.Show(
-                                "Could not enable constraints. Delete incompliant data?", "Error",
-                                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes
-                            ? "true"
-                            : "false";
+                        "Could not enable constraints. Delete incompliant data?", "Error",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes
+                        ? "true"
+                        : "false";
                     }
                     if (Convert.ToBoolean(incompliantDataDeletion))
                     {
                         //delete data which prevents constraints from being enabled
                         DisableAllDestinationConstraints();
                         const string sql = @"select
-                                fk.name as fk_constraint_name,
-                                fk_cols.constraint_column_id as fk_constraint_column_id,
-                                QUOTENAME(schema_name(tab.schema_id)) + '.' + QUOTENAME(tab.name) as fk_foreign_table,
-                                QUOTENAME(col.name) as fk_column,
-                                QUOTENAME(schema_name(pk_tab.schema_id)) + '.' + QUOTENAME(pk_tab.name) as primary_table,
-                                QUOTENAME(pk_col.name) as primary_column
+                            fk.name as fk_constraint_name,
+                            fk_cols.constraint_column_id as fk_constraint_column_id,
+                            QUOTENAME(schema_name(tab.schema_id)) + '.' + QUOTENAME(tab.name) as fk_foreign_table,
+                            QUOTENAME(col.name) as fk_column,
+                            QUOTENAME(schema_name(pk_tab.schema_id)) + '.' + QUOTENAME(pk_tab.name) as primary_table,
+                            QUOTENAME(pk_col.name) as primary_column
                             from sys.tables tab
-                                inner join sys.columns col on col.object_id = tab.object_id
-                                inner join sys.foreign_key_columns fk_cols
-                                    on fk_cols.parent_object_id = tab.object_id
-                                    and fk_cols.parent_column_id = col.column_id
-                                inner join sys.foreign_keys fk on fk.object_id = fk_cols.constraint_object_id
-                                inner join sys.tables pk_tab on pk_tab.object_id = fk_cols.referenced_object_id
-                                inner join sys.columns pk_col
-                                    on pk_col.column_id = fk_cols.referenced_column_id
-                                    and pk_col.object_id = fk_cols.referenced_object_id
+                            inner join sys.columns col on col.object_id = tab.object_id
+                            inner join sys.foreign_key_columns fk_cols
+                            on fk_cols.parent_object_id = tab.object_id
+                            and fk_cols.parent_column_id = col.column_id
+                            inner join sys.foreign_keys fk on fk.object_id = fk_cols.constraint_object_id
+                            inner join sys.tables pk_tab on pk_tab.object_id = fk_cols.referenced_object_id
+                            inner join sys.columns pk_col
+                            on pk_col.column_id = fk_cols.referenced_column_id
+                            and pk_col.object_id = fk_cols.referenced_object_id
                             order by 5,3,1,2";
 
                         using (SqlCommand command = destinationConnection.SqlConnectionObject.CreateCommand())
@@ -180,22 +180,71 @@ namespace Sql2SqlCloner.Core.Data
             }
         }
 
+        private string GetMasterHistoryTable(SqlConnection connection, string tableName)
+        {
+            if (connection.State != ConnectionState.Open)
+                connection.Open();
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = @"select QUOTENAME(sche.name) + '.' + QUOTENAME(tab.name) AS MasterHistoryTable
+                        from (sys.tables tab inner join sys.schemas sche on sche.schema_id=tab.schema_id)
+                        where history_table_id =
+                        (
+                            select object_id
+                            from (sys.tables tab inner join sys.schemas sche on sche.schema_id=tab.schema_id)
+                            where sche.name=@schema and tab.name=@table
+                        )";
+                command.CommandTimeout = SqlTimeout;
+                command.CommandType = CommandType.Text;
+                var tablesplit = tableName.Split('.');
+                command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
+                command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
+                using (var reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
+
+                    {
+                        return (string)reader["MasterHistoryTable"];
+                    }
+                }
+                return null;
+            }
+        }
+
         public bool TransferData(string table, string query)
         {
             SqlDataReader reader = null;
             try
             {
+                var masterhistorytable = GetMasterHistoryTable(destinationConnection.SqlConnectionObject, table);
+                if (!string.IsNullOrEmpty(masterhistorytable))
+                {
+                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = OFF)", destinationConnection.SqlConnectionObject)
+                    {
+                        CommandTimeout = SqlTimeout
+                    }.ExecuteNonQuery();
+                }
+
                 bulkCopy.DestinationTableName = table;
                 bulkCopy.ColumnMappings.Clear();
                 GetMapping(sourceConnection.SqlConnectionObject, destinationConnection.SqlConnectionObject, table).ToList().
-                    ForEach(columnName => bulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(columnName, columnName)));
+                ForEach(columnName => bulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(columnName, columnName)));
 
-                SqlCommand myCommand = new SqlCommand(query, sourceConnection.SqlConnectionObject)
+                using (SqlCommand myCommand = new SqlCommand(query, sourceConnection.SqlConnectionObject))
                 {
-                    CommandTimeout = SqlTimeout
-                };
-                reader = myCommand.ExecuteReader();
-                bulkCopy.WriteToServer(reader);
+                    myCommand.CommandTimeout = SqlTimeout;
+                    reader = myCommand.ExecuteReader();
+                    bulkCopy.WriteToServer(reader);
+                    reader.Close();
+                }
+
+                if (!string.IsNullOrEmpty(masterhistorytable))
+                {
+                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = ON (HISTORY_TABLE = {table}, DATA_CONSISTENCY_CHECK = ON))", destinationConnection.SqlConnectionObject)
+                    {
+                        CommandTimeout = SqlTimeout
+                    }.ExecuteNonQuery();
+                }
                 return true;
             }
             finally

@@ -51,6 +51,7 @@
             // btnNext
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnNext.Enabled = false;
             this.btnNext.Location = new System.Drawing.Point(516, 276);
             this.btnNext.Name = "btnNext";
             this.btnNext.Size = new System.Drawing.Size(75, 23);
@@ -73,16 +74,17 @@
             this.label1.AutoSize = true;
             this.label1.Location = new System.Drawing.Point(9, 9);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(27, 13);
+            this.label1.Size = new System.Drawing.Size(70, 13);
             this.label1.TabIndex = 7;
-            this.label1.Text = "Title";
+            this.label1.Text = "Please wait...";
             // 
             // btnCancel
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.Location = new System.Drawing.Point(597, 276);
+            this.btnCancel.Enabled = false;
+            this.btnCancel.Location = new System.Drawing.Point(598, 276);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(75, 23);
+            this.btnCancel.Size = new System.Drawing.Size(74, 23);
             this.btnCancel.TabIndex = 5;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
@@ -92,7 +94,7 @@
             // 
             this.label2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(15, 276);
+            this.label2.Location = new System.Drawing.Point(20, 280);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(21, 13);
             this.label2.TabIndex = 9;
@@ -101,8 +103,11 @@
             // dataGridView1
             // 
             this.dataGridView1.AllowUserToAddRows = false;
-            this.dataGridView1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left)));
+            this.dataGridView1.AllowUserToDeleteRows = false;
+            this.dataGridView1.AllowUserToResizeRows = false;
+            this.dataGridView1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.dataGridView1.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             this.dataGridView1.BackgroundColor = System.Drawing.SystemColors.Window;
             this.dataGridView1.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
@@ -115,7 +120,10 @@
             this.HasRelationships});
             this.dataGridView1.Location = new System.Drawing.Point(12, 36);
             this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersWidth = 25;
+            this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dataGridView1.ShowEditingIcon = false;
             this.dataGridView1.Size = new System.Drawing.Size(660, 194);
             this.dataGridView1.TabIndex = 0;
             // 
@@ -124,29 +132,34 @@
             this.Status.FillWeight = 101.5228F;
             this.Status.HeaderText = "Status";
             this.Status.Name = "Status";
+            this.Status.ReadOnly = true;
             // 
             // Table
             // 
             this.Table.FillWeight = 99.49238F;
             this.Table.HeaderText = "Table";
             this.Table.Name = "Table";
+            this.Table.ReadOnly = true;
             // 
             // SqlCommand
             // 
             this.SqlCommand.FillWeight = 99.49238F;
             this.SqlCommand.HeaderText = "SqlCommand";
             this.SqlCommand.Name = "SqlCommand";
+            this.SqlCommand.ReadOnly = true;
             // 
             // Error
             // 
             this.Error.FillWeight = 99.49238F;
             this.Error.HeaderText = "Error";
             this.Error.Name = "Error";
+            this.Error.ReadOnly = true;
             // 
             // HasRelationships
             // 
             this.HasRelationships.HeaderText = "HasRelationships";
             this.HasRelationships.Name = "HasRelationships";
+            this.HasRelationships.ReadOnly = true;
             this.HasRelationships.Visible = false;
             // 
             // Timer1
@@ -157,7 +170,8 @@
             // btnCopyMessages
             // 
             this.btnCopyMessages.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCopyMessages.Location = new System.Drawing.Point(329, 276);
+            this.btnCopyMessages.Enabled = false;
+            this.btnCopyMessages.Location = new System.Drawing.Point(330, 276);
             this.btnCopyMessages.Name = "btnCopyMessages";
             this.btnCopyMessages.Size = new System.Drawing.Size(111, 23);
             this.btnCopyMessages.TabIndex = 1;
@@ -169,6 +183,7 @@
             // btnPause
             // 
             this.btnPause.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnPause.Enabled = false;
             this.btnPause.Location = new System.Drawing.Point(446, 276);
             this.btnPause.Name = "btnPause";
             this.btnPause.Size = new System.Drawing.Size(64, 23);

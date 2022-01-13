@@ -1,4 +1,6 @@
-﻿using Sql2SqlCloner.Core.Schema;
+﻿using Microsoft.SqlServer.Management.Smo;
+using Sql2SqlCloner.Core.DataTransfer;
+using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -95,21 +97,28 @@ namespace Sql2SqlCloner
                 CopyList.FirstOrDefault().Status = null;
             }
             currentlyCopying = "Processing schema...";
-            bool overrideCollation, useSourceCollation;
-            overrideCollation = useSourceCollation = transfer.NoCollation = false;
+            bool overrideCollation = false, useSourceCollation = false;
+            transfer.NoCollation = false;
             switch (Properties.Settings.Default.CopyCollation)
             {
-                case 1: //no collation
+                //ignore collation, do nothing
+                case SqlCollationAction.Ignore_collation:
+                    overrideCollation = useSourceCollation = false;
+                    break;
+                //no collation
+                case SqlCollationAction.Keep_source_db_collation:
+                    overrideCollation = useSourceCollation = false;
+                    transfer.NoCollation = false;
+                    break;
+                //override collation, use source db
+                case SqlCollationAction.No_collation:
+                    overrideCollation = useSourceCollation = true;
                     transfer.NoCollation = true;
                     break;
-                case 2: //override collation, use source db
-                    overrideCollation = useSourceCollation = true;
-                    break;
-                case 3: //override collation, use destination db
+                //override collation, use destination db (source collation will be converted at SELECT time)
+                case SqlCollationAction.Set_destination_db_collation:
                     overrideCollation = true;
                     useSourceCollation = false;
-                    break;
-                default: //0 ignore, do nothing about collation
                     break;
             }
             transfer.IncludeExtendedProperties = Properties.Settings.Default.CopyExtendedProperties;
@@ -127,6 +136,11 @@ namespace Sql2SqlCloner
             var finishedPass1 = false;
             var finishedPass2 = false;
 
+            //system-versioned history tables will be created automatically, remove them
+            foreach (Table systemhistorytable in currList.Select(o => o.Object).OfType<Table>().Where(t => t.IsSystemVersioned).ToList())
+            {
+                currList.Remove(currList.First(t => (t.Object is Table table) && table.ID == systemhistorytable.HistoryTableID));
+            }
             //the first time indexes won't be available, therefore some items dependent on them
             //such as FullText objects won't be created, the second time indexes will be available
             //so that those objects will be created
@@ -157,10 +171,12 @@ namespace Sql2SqlCloner
                         {
                             transfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation);
                             item.Status = Properties.Resources.success;
+                            item.Status.Tag = "OK";
                         }
                         catch (Exception ex)
                         {
                             item.Status = Properties.Resources.failure;
+                            item.Status.Tag = "ERROR";
                             item.Error = string.Empty;
                             var exc = ex;
                             while (exc != null)
@@ -181,11 +197,7 @@ namespace Sql2SqlCloner
                     }
                     finishedPass1 = (errorCount == 0 || errorCount == currList.Count);
                 }
-                if (!CopyConstraints)
-                {
-                    finishedPass2 = true;
-                }
-                else
+                if (CopyConstraints)
                 {
                     finishedPass2 = finishedPass1 = errorCount == 0;
                     CopyConstraints = false;
@@ -244,7 +256,13 @@ namespace Sql2SqlCloner
                     }
                     current = savecurrent + CopyList.Count(i => i.Type == "Table" || i.Type == "View");
                     if (!finishedPass2)
+                    {
                         currentlyCopying = "Retrying failed objects";
+                    }
+                }
+                else
+                {
+                    finishedPass2 = true;
                 }
             }
 
@@ -291,6 +309,10 @@ namespace Sql2SqlCloner
             if (Properties.Settings.Default.CopySecurity)
             {
                 transfer.CopySchemaAuthorization();
+            }
+            if (Properties.Settings.Default.CopyData)
+            {
+                transfer.RemoveDestinationSchemaBoundObjects();
             }
             percentage = 100;
             backgroundWorker1.ReportProgress(100);
@@ -386,6 +408,7 @@ namespace Sql2SqlCloner
             if (item.Status != Properties.Resources.failure)
             {
                 item.Status = Properties.Resources.warning;
+                item.Status.Tag = "WARNING";
                 item.Error = string.Empty;
                 var exc = ex;
                 while (exc != null)
@@ -453,27 +476,23 @@ namespace Sql2SqlCloner
             var firstRow = true;
             foreach (DataGridViewRow row in dataGridView1.Rows)
             {
-                if (!firstRow)
-                    sb.Append(Environment.NewLine);
-                else
+                if (firstRow)
                     firstRow = false;
+                else
+                    sb.Append(Environment.NewLine);
                 var firstCell = true;
                 foreach (DataGridViewCell cell in row.Cells)
                 {
-                    if (!firstCell)
-                        sb.Append('\t');
-                    else
+                    if (firstCell)
                         firstCell = false;
+                    else
+                        sb.Append('\t');
                     if (cell is DataGridViewImageCell)
                     {
                         if (cell.Value == null)
                             sb.Append("N/A");
-                        else if (((System.Drawing.Bitmap)cell.Value).Flags == Properties.Resources.success.Flags)
-                            sb.Append("OK");
-                        else if (((System.Drawing.Bitmap)cell.Value).Flags == Properties.Resources.warning.Flags)
-                            sb.Append("WARNING");
                         else
-                            sb.Append("ERROR");
+                            sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
                     }
                     else
                     {

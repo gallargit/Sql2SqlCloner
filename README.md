@@ -14,6 +14,8 @@ SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject
   * Use multithreading and prefetch wherever possible to decrease copying time
   * Incompliant data deletion (if foreign keys can't be activated after copying data you can choose whether to delete the incompliant data or not)
   * Copy users and permissions (GRANT)
+  * Convert database collation option
+  * Copy system-versioned tables
   * Some Azure-specific modifications  
 
 * Fixes:

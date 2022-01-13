@@ -1,5 +1,6 @@
 ﻿using Sql2SqlCloner.Components;
-using Sql2SqlCloner.Core.Schema;
+using Sql2SqlCloner.Core.DataTransfer;
+using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -196,7 +197,9 @@ namespace Sql2SqlCloner
                                 tn.Checked = false;
                             }
                             if (!CopyOnlySchema)
+                            {
                                 tn.Checked = tn.Checked && !CheckIfInList(currentitem.Name, excludeDataLoadingList);
+                            }
                             tn.Tag = currentitem;
                             tn.Text += FormatCopyData(currenttable.RowCount, currenttable.TopRecords, currenttable.WhereFilter);
                         }
@@ -223,10 +226,6 @@ namespace Sql2SqlCloner
                 if (e.Button == MouseButtons.Right)
                 {
                     NodeContextMenu.Show(treeView1, e.Location);
-                }
-                if (e.Button == MouseButtons.Left && CurrentNode.Tag != null && !CurrentNode.Checked)
-                {
-                    // CurrentNode.Parent.Checked = true;
                 }
             }
         }
@@ -378,6 +377,8 @@ namespace Sql2SqlCloner
             if (SelectOnlyTables)
             {
                 DialogResult = DialogResult.OK;
+                Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
+                Properties.Settings.Default.Save();
             }
             else
             {
@@ -388,9 +389,9 @@ namespace Sql2SqlCloner
                 Properties.Settings.Default.CopySecurity = copySecurity.Checked;
                 Properties.Settings.Default.CopyExtendedProperties = copyExtendedProperties.Checked;
                 Properties.Settings.Default.CopyPermissions = copyPermissions.Checked;
-                Properties.Settings.Default.CopyCollation = copyCollation.SelectedIndex;
                 Properties.Settings.Default.StopIfErrors = stopIfErrors.Checked;
                 Properties.Settings.Default.ClearDestinationDatabase = clearDestinationDatabase.Checked;
+                Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
                 Properties.Settings.Default.Save();
 
                 DialogResult = new CopySchema(transfer, SelectedObjects.ToList(), CloseIfSuccess, treeView1.Nodes[0].Checked).ShowDialog();
@@ -442,6 +443,7 @@ namespace Sql2SqlCloner
 
         private void ChooseSchemas_Load(object sender, EventArgs e)
         {
+            Enum.GetNames(typeof(SqlCollationAction)).ToList().ForEach(n => copyCollation.Items.Add(n.Replace("_", " ")));
             Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
             copyConstraints.Checked = Properties.Settings.Default.CopyConstraints;
             copyFullText.Checked = Properties.Settings.Default.CopyFullText;
@@ -449,9 +451,9 @@ namespace Sql2SqlCloner
             copySecurity.Checked = Properties.Settings.Default.CopySecurity;
             copyExtendedProperties.Checked = Properties.Settings.Default.CopyExtendedProperties;
             copyPermissions.Checked = Properties.Settings.Default.CopyPermissions;
-            copyCollation.SelectedIndex = Properties.Settings.Default.CopyCollation;
             stopIfErrors.Checked = Properties.Settings.Default.StopIfErrors;
             clearDestinationDatabase.Checked = Properties.Settings.Default.ClearDestinationDatabase;
+            copyCollation.SelectedIndex = (int)Properties.Settings.Default.CopyCollation;
 
             if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
                 btnNext_Click(sender, e);
