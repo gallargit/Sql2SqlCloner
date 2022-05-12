@@ -46,6 +46,23 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
         public void EnableAllDestinationConstraints()
         {
+            //enable constraints one by one, this will enable all disabled constraints (which can be enabled)
+            //in a broken database and also remove the untrusted bit in all keys
+            var SQLEnableConstraints = @"SELECT 
+	            'ALTER TABLE ' + [t].[name] + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([c].[name])
+                FROM
+                    sys.tables AS t
+                    INNER JOIN sys.check_constraints AS c ON t.[object_id] = c.parent_object_id
+                WHERE
+                    c.is_disabled = 1
+                UNION
+                SELECT 
+	            'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME([schema_id])) + N'.' + QUOTENAME(OBJECT_NAME([parent_object_id])) + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([name])
+                FROM 
+                    sys.[foreign_keys] 
+                WHERE 
+                    [is_disabled] = 1 OR [is_not_trusted] = 1";
+
             var finished = false;
             var incompliantDataDeletion = ConfigurationManager.AppSettings["IncompliantDataDeletion"].ToLowerInvariant();
             while (!finished)
@@ -54,13 +71,16 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 {
                     EnableDestinationConstraints();
                     finished = true;
+                    RunInDestination(SQLEnableConstraints);
+
                 }
                 catch (Exception ex)
                 {
                     if (incompliantDataDeletion != "true" && incompliantDataDeletion != "false")
                     {
                         incompliantDataDeletion = MessageBox.Show(
-                        "Could not enable constraints. Delete incompliant data?", "Error",
+                        "Could not enable constraints. Delete incompliant data?" + Environment.NewLine + Environment.NewLine +
+                        "Last error was: " + ex.Message, "Error",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes
                         ? "true"
                         : "false";
@@ -103,7 +123,9 @@ namespace Sql2SqlCloner.Core.DataTransfer
                                     if (previousconstraint != reader["fk_constraint_name"].ToString())
                                     {
                                         if (deletesentence != "")
+                                        {
                                             lstDelete.Add(deletesentence += ")");
+                                        }
 
                                         deletesentence = $"DELETE FROM {reader["fk_foreign_table"]} WHERE NOT EXISTS(SELECT 1 FROM {reader["primary_table"]} WHERE ";
                                     }
@@ -115,7 +137,9 @@ namespace Sql2SqlCloner.Core.DataTransfer
                                     previousconstraint = reader["fk_constraint_name"].ToString();
                                 }
                                 if (deletesentence != "")
+                                {
                                     lstDelete.Add(deletesentence += ")");
+                                }
                             }
                             var deletedrows = 0;
                             using (SqlCommand cmdDelete = new SqlCommand())
@@ -137,6 +161,11 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     }
                     else
                     {
+                        try
+                        {
+                            RunInDestination(SQLEnableConstraints);
+                        }
+                        catch { }
                         throw new Exception("Could not enable constraints");
                     }
                 }
@@ -151,7 +180,10 @@ namespace Sql2SqlCloner.Core.DataTransfer
         private IEnumerable<string> GetSchema(SqlConnection connection, string tableName)
         {
             if (connection.State != ConnectionState.Open)
+            {
                 connection.Open();
+            }
+
             using (SqlCommand command = connection.CreateCommand())
             {
                 command.CommandText = @"select sche.name schemaName, tab.name tableName, col.name colName,
@@ -183,7 +215,10 @@ namespace Sql2SqlCloner.Core.DataTransfer
         private string GetMasterHistoryTable(SqlConnection connection, string tableName)
         {
             if (connection.State != ConnectionState.Open)
+            {
                 connection.Open();
+            }
+
             using (SqlCommand command = connection.CreateCommand())
             {
                 command.CommandText = @"select QUOTENAME(sche.name) + '.' + QUOTENAME(tab.name) AS MasterHistoryTable
@@ -250,7 +285,9 @@ namespace Sql2SqlCloner.Core.DataTransfer
             finally
             {
                 if (reader?.IsClosed == false)
+                {
                     reader.Close();
+                }
             }
         }
     }

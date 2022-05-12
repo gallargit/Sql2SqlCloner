@@ -17,7 +17,10 @@ namespace Sql2SqlCloner.Components
         public InputBoxValidate(string title, string promptText, bool validateLong = false, Icon icon = null)
         {
             if (icon != null)
+            {
                 Icon = icon;
+            }
+
             Text = title;
             label.Text = promptText;
 

@@ -210,7 +210,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                 var scripts = transfer.ScriptTransfer();
                 if (scripts.Count == 0)
+                {
                     throw new Exception($"Could not script object {namewithschema}");
+                }
 
                 foreach (var script in scripts)
                 {
@@ -224,7 +226,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     }
                     var scriptRun = script;
                     while (scriptRun.StartsWith("\n") || scriptRun.StartsWith("\r"))
+                    {
                         scriptRun = scriptRun.Substring(1);
+                    }
+
                     if (scriptRun.StartsWith("CREATE USER"))
                     {
                         CreateLogin(obj.Name);
@@ -351,7 +356,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     {
                         lst.Add(sub);
                         if (sub.DefaultConstraint != null)
+                        {
                             lst.Add(sub.DefaultConstraint);
+                        }
                     }
                     foreach (Index sub in currentTable.Indexes)
                     {
@@ -472,7 +479,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (RecreateObjects.Count > 0)
+            {
                 ClearDestinationDatabase(RecreateObjects);
+            }
         }
 
         public void RecreateDestinationSchemaBoundObjects()
@@ -570,32 +579,50 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (User item in db.Users)
             {
                 if (!item.IsSystemObject)
+                {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
+                }
             }
             foreach (DatabaseRole item in db.Roles)
             {
                 if (!item.IsFixedRole && item.Name != "public")
+                {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
+                }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (Schema item in db.Schemas)
             {
                 if (!item.IsSystemObject)
+                {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
+                }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (UserDefinedDataType item in db.UserDefinedDataTypes)
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             if (isRunningMinimumSQL2008)
             {
                 foreach (UserDefinedTableType item in db.UserDefinedTableTypes)
@@ -604,25 +631,37 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (XmlSchemaCollection item in db.XmlSchemaCollections)
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (PartitionFunction item in db.PartitionFunctions)
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (PartitionScheme item in db.PartitionSchemes)
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
             if (!isRunningMinimumSQL2012)
             {
@@ -636,7 +675,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             var alwaysIncludeTables = ConfigurationManager.AppSettings["AlwaysIncludeTables"];
             IList<string> alwaysIncludeTablesList = new List<string>();
             if (!string.IsNullOrEmpty(alwaysIncludeTables))
@@ -669,13 +711,19 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (Default item in db.Defaults)
             {
                 items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (Table item in db.Tables)
             {
                 var tableName = $"{item.Schema}.{item.Name}";
@@ -697,7 +745,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
 
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (View item in db.Views)
             {
                 if (!item.IsSystemObject)
@@ -718,7 +769,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (UserDefinedFunction item in db.UserDefinedFunctions)
             {
                 if (!item.IsSystemObject || item.Owner != "sys")
@@ -727,7 +781,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (StoredProcedure item in db.StoredProcedures)
             {
                 if (!item.IsSystemObject || item.Owner != "sys")
@@ -736,7 +793,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
             if (token.IsCancellationRequested)
+            {
                 return items;
+            }
+
             foreach (DatabaseDdlTrigger item in db.Triggers)
             {
                 if (!item.IsSystemObject)
@@ -883,7 +943,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public void ApplyForeignKeys(NamedSmoObject sTable)
+        public void ApplyForeignKeys(NamedSmoObject sTable, bool disableNotForReplication)
         {
             foreach (ForeignKey sourcefk in (sTable as Table)?.ForeignKeys)
             {
@@ -894,7 +954,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         DeleteAction = sourcefk.DeleteAction,
                         IsChecked = sourcefk.IsChecked,
                         IsEnabled = sourcefk.IsEnabled,
-                        NotForReplication = sourcefk.NotForReplication,
+                        NotForReplication = !disableNotForReplication && sourcefk.NotForReplication,
                         ReferencedTable = sourcefk.ReferencedTable,
                         ReferencedTableSchema = sourcefk.ReferencedTableSchema,
                         UpdateAction = sourcefk.UpdateAction
@@ -914,7 +974,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public void ApplyChecks(NamedSmoObject sTable)
+        public void ApplyChecks(NamedSmoObject sTable, bool disableNotForReplication)
         {
             foreach (Check chkConstr in (sTable as Table)?.Checks)
             {
@@ -924,6 +984,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     {
                         IsChecked = chkConstr.IsChecked,
                         IsEnabled = chkConstr.IsEnabled,
+                        NotForReplication = !disableNotForReplication && chkConstr.NotForReplication,
                         Text = chkConstr.Text
                     }.Create();
                 }
@@ -974,14 +1035,21 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 sourceDatabase.PrefetchObjects(typeof(Table), new ScriptingOptions());
                 if (!token.IsCancellationRequested)
+                {
                     SourceObjects = GetSqlObjects(sourceConnection, sourceDatabase);
+                }
             });
             if (sameserver || (ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() != "true"))
+            {
                 tskSource.Wait();
+            }
+
             var tskDestination = Task.Run(() =>
             {
                 if (!token.IsCancellationRequested)
+                {
                     DestinationObjects = GetSqlObjects(destinationConnection, destinationDatabase);
+                }
             });
 
             tskSource.Wait();
@@ -992,7 +1060,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         {
             var lastError = "";
             if (DestinationObjects.Count == 0 || lstDelete?.Count == 0)
+            {
                 return;
+            }
 
             var lastCount = 0;
             int remaining = DestinationObjects.Count;
@@ -1027,7 +1097,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     try
                     {
                         if (lstDelete == null)
+                        {
                             transferDrop.DisableAllDestinationConstraints();
+                        }
+
                         using (SqlCommand command = new SqlCommand())
                         {
                             command.Connection = transferDrop.destinationConnection.SqlConnectionObject;
@@ -1037,7 +1110,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 foreach (Table table in transferDrop.DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object))
                                 {
                                     if (token.IsCancellationRequested)
+                                    {
                                         return;
+                                    }
+
                                     if (table.IsSystemVersioned)
                                     {
                                         table.IsSystemVersioned = false;
@@ -1059,7 +1135,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 foreach (NamedSmoObject obj in destinations.ToList())
                                 {
                                     if (token.IsCancellationRequested)
+                                    {
                                         return;
+                                    }
+
                                     try
                                     {
                                         transferDrop.transfer.ObjectList.Clear();
@@ -1075,7 +1154,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                     catch (Exception ex)
                                     {
                                         if (!string.IsNullOrEmpty(ex.Message))
+                                        {
                                             lastError = $". {ex.Message} Affected object: {obj.Name}";
+                                        }
                                     }
                                 }
                                 if (lstDelete != null)
@@ -1096,7 +1177,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         try
                         {
                             if (lstDelete == null)
+                            {
                                 transferDrop.destinationDatabase.RemoveFullTextCatalogs();
+                            }
                         }
                         catch { }
                     }
@@ -1104,7 +1187,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     //refresh local object before exiting
                     RefreshDestinationObjects();
                     if (lstDelete == null)
+                    {
                         remaining = DestinationObjects.Count;
+                    }
                 }
             }
             if (lstDelete == null && DestinationObjects.Count > 0)

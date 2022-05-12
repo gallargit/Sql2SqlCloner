@@ -3,6 +3,7 @@ using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -15,7 +16,8 @@ namespace Sql2SqlCloner
     {
         public List<SqlSchemaObject> CopyList { get; }
         private readonly SqlSchemaTransfer transfer;
-        private readonly bool CloseIfSuccess;
+        private readonly bool closeIfSuccess;
+        private readonly bool disableNotForReplication;
         private string lastError = "";
         private string currentlyCopying = "";
         private double current;
@@ -28,10 +30,12 @@ namespace Sql2SqlCloner
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
 
-        public CopySchema(SqlSchemaTransfer transferSchema, List<SqlSchemaObject> lstObjects, bool closeIfSuccess, bool autoStart)
+        public CopySchema(SqlSchemaTransfer transferSchema, List<SqlSchemaObject> lstObjects,
+            bool closeIfSuccess, bool autoStart, bool disableNotForReplication)
         {
             InitializeComponent();
-            CloseIfSuccess = closeIfSuccess;
+            this.disableNotForReplication = disableNotForReplication;
+            this.closeIfSuccess = closeIfSuccess;
             transfer = transferSchema;
             CopyList = lstObjects.ToList();
 
@@ -54,7 +58,9 @@ namespace Sql2SqlCloner
 
             label1.Text = "Click on the 'Copy' button to start copying below listed SQL objects";
             if (autoStart)
+            {
                 btnNext_Click(null, null);
+            }
         }
 
         private void btnNext_Click(object sender, EventArgs e)
@@ -126,11 +132,20 @@ namespace Sql2SqlCloner
             double max = CopyList.Count;
             var CopyConstraints = Properties.Settings.Default.CopyConstraints;
             if (CopyConstraints)
+            {
                 max += CopyList.Count(i => i.Type == "Table" || i.Type == "View") * 4.0;
+            }
+
             if (Properties.Settings.Default.CopyExtendedProperties)
+            {
                 max += CopyList.Count / 5.0;
+            }
+
             if (Properties.Settings.Default.CopyPermissions)
+            {
                 max += CopyList.Count / 6.0;
+            }
+
             var retries = 0;
             var currList = CopyList;
             var finishedPass1 = false;
@@ -151,7 +166,10 @@ namespace Sql2SqlCloner
                 while (!finishedPass1)
                 {
                     if (windowClosing)
+                    {
                         return;
+                    }
+
                     if (retries > 0)
                     {
                         currList = currList.Where(item => !string.IsNullOrEmpty(item.Error) &&
@@ -164,9 +182,15 @@ namespace Sql2SqlCloner
                     {
                         pause.WaitOne(Timeout.Infinite);
                         if (windowClosing)
+                        {
                             return;
+                        }
+
                         if (backgroundWorker1.CancellationPending)
+                        {
                             break;
+                        }
+
                         try
                         {
                             transfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation);
@@ -183,7 +207,10 @@ namespace Sql2SqlCloner
                             {
                                 lastError = $"{exc.Message} (affected object: {item.Name})";
                                 if (item.Error != "")
+                                {
                                     item.Error += ";";
+                                }
+
                                 item.Error += exc.Message;
                                 exc = exc.InnerException;
                             }
@@ -202,7 +229,10 @@ namespace Sql2SqlCloner
                     finishedPass2 = finishedPass1 = errorCount == 0;
                     CopyConstraints = false;
                     if (windowClosing)
+                    {
                         return;
+                    }
+
                     transfer.RefreshDestination();
                     currentlyCopying = "Processing indexes...";
                     foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").ToList())
@@ -219,7 +249,10 @@ namespace Sql2SqlCloner
                         backgroundWorker1.ReportProgress((int)((current += 2) / max * 100.0));
                     }
                     if (windowClosing)
+                    {
                         return;
+                    }
+
                     currentlyCopying = "Processing foreign keys...";
                     var savecurrent = current;
                     foreach (var item in CopyList.Where(i => i.Type == "Table").ToList())
@@ -227,7 +260,7 @@ namespace Sql2SqlCloner
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
-                            transfer.ApplyForeignKeys(item.Object);
+                            transfer.ApplyForeignKeys(item.Object, disableNotForReplication);
                         }
                         catch (Exception ex)
                         {
@@ -238,7 +271,10 @@ namespace Sql2SqlCloner
                     current = savecurrent + CopyList.Count(i => i.Type == "Table" || i.Type == "View");
 
                     if (windowClosing)
+                    {
                         return;
+                    }
+
                     savecurrent = current;
                     currentlyCopying = "Processing checks...";
                     foreach (var item in CopyList.Where(i => i.Type == "Table"))
@@ -246,7 +282,7 @@ namespace Sql2SqlCloner
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
-                            transfer.ApplyChecks(item.Object);
+                            transfer.ApplyChecks(item.Object, disableNotForReplication);
                             backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
                         }
                         catch (Exception ex)
@@ -268,7 +304,10 @@ namespace Sql2SqlCloner
 
             btnPauseEnabled = false;
             if (windowClosing)
+            {
                 return;
+            }
+
             if (Properties.Settings.Default.CopyExtendedProperties)
             {
                 currentlyCopying = "Processing extended properties...";
@@ -281,7 +320,10 @@ namespace Sql2SqlCloner
                 catch (Exception ex)
                 {
                     if (Properties.Settings.Default.StopIfErrors)
+                    {
                         MessageBox.Show($"Error copying extended properties: {ex.Message}");
+                    }
+
                     lastError = ex.Message;
                     errorCount++;
                 }
@@ -299,13 +341,19 @@ namespace Sql2SqlCloner
                 catch (Exception ex)
                 {
                     if (Properties.Settings.Default.StopIfErrors)
+                    {
                         MessageBox.Show($"Error copying permissions: {ex.Message}");
+                    }
+
                     lastError = ex.Message;
                     errorCount++;
                 }
             }
             transfer.EnableDestinationConstraints();
-            transfer.DisableDisabledObjects();
+            if (ConfigurationManager.AppSettings["DisableDisabledObjects"].ToLower() == "true")
+            {
+                transfer.DisableDisabledObjects();
+            }
             if (Properties.Settings.Default.CopySecurity)
             {
                 transfer.CopySchemaAuthorization();
@@ -332,9 +380,13 @@ namespace Sql2SqlCloner
                         if (autoScrollGrid.Checked)
                         {
                             if (currrow < dataGridView1.RowCount && currrow > 7 && dataGridView1.FirstDisplayedScrollingRowIndex != currrow - 8)
+                            {
                                 dataGridView1.FirstDisplayedScrollingRowIndex = currrow - 8;
+                            }
                             else if (currrow < 10)
+                            {
                                 dataGridView1.Refresh();
+                            }
                         }
                     }
                     catch { }
@@ -359,9 +411,14 @@ namespace Sql2SqlCloner
                 dataGridView1.Cursor = Cursors.Default;
                 label1.Text = "Operation completed";
                 if (errorCount == 0)
+                {
                     label1.Text += " successfully";
+                }
                 else
+                {
                     label1.Text += $" with {errorCount} errors";
+                }
+
                 btnCancel.Text = "Close";
                 btnCopyMessages.Visible = true;
                 dataGridView1.Refresh();
@@ -370,7 +427,7 @@ namespace Sql2SqlCloner
                     autoScrollGrid.Text = "Show only errors";
                     autoScrollGrid.CheckState = CheckState.Unchecked;
                 }
-                if (CloseIfSuccess || !Properties.Settings.Default.StopIfErrors)
+                if (closeIfSuccess || !Properties.Settings.Default.StopIfErrors)
                 {
                     if (CopyList.All(t => string.IsNullOrEmpty(t.Error)) || !Properties.Settings.Default.StopIfErrors)
                     {
@@ -415,7 +472,10 @@ namespace Sql2SqlCloner
                 {
                     lastError = $"{exc.Message} (affected object: {item.Name})";
                     if (item.Error != "")
+                    {
                         item.Error += ";";
+                    }
+
                     item.Error += exc.Message;
                     exc = exc.InnerException;
                 }
@@ -477,22 +537,36 @@ namespace Sql2SqlCloner
             foreach (DataGridViewRow row in dataGridView1.Rows)
             {
                 if (firstRow)
+                {
                     firstRow = false;
+                }
                 else
+                {
                     sb.Append(Environment.NewLine);
+                }
+
                 var firstCell = true;
                 foreach (DataGridViewCell cell in row.Cells)
                 {
                     if (firstCell)
+                    {
                         firstCell = false;
+                    }
                     else
+                    {
                         sb.Append('\t');
+                    }
+
                     if (cell is DataGridViewImageCell)
                     {
                         if (cell.Value == null)
+                        {
                             sb.Append("N/A");
+                        }
                         else
+                        {
                             sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                        }
                     }
                     else
                     {
@@ -528,9 +602,13 @@ namespace Sql2SqlCloner
             if (autoScrollGrid.Text == "Show only errors")
             {
                 if (autoScrollGrid.Checked)
+                {
                     dataGridView1.DataSource = CopyList.Where(i => !string.IsNullOrEmpty(i.Error)).ToList();
+                }
                 else
+                {
                     dataGridView1.DataSource = CopyList;
+                }
             }
         }
     }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.SqlServer.Management.Common;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
@@ -46,6 +47,41 @@ namespace Sql2SqlCloner.Core
                         }
                     }
                     catch { }
+                }
+            }
+        }
+
+        protected void RunInDestination(string sql)
+        {
+            var lstToRun = new List<string>();
+            using (SqlCommand commandSource = destinationConnection.SqlConnectionObject.CreateCommand())
+            {
+                commandSource.CommandText = sql;
+                commandSource.CommandType = CommandType.Text;
+                commandSource.CommandTimeout = SqlTimeout;
+                using (var reader = commandSource.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        lstToRun.Add((string)reader[0]);
+                    }
+                }
+            }
+            if (lstToRun.Count > 0)
+            {
+                using (SqlCommand commandDestination = destinationConnection.SqlConnectionObject.CreateCommand())
+                {
+                    commandDestination.CommandType = CommandType.Text;
+                    commandDestination.CommandTimeout = SqlTimeout;
+                    foreach (var item in lstToRun)
+                    {
+                        try
+                        {
+                            commandDestination.CommandText = item;
+                            commandDestination.ExecuteNonQuery();
+                        }
+                        catch { }
+                    }
                 }
             }
         }

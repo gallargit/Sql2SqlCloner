@@ -70,7 +70,9 @@ namespace Sql2SqlCloner
             {
                 dialog.DataSources.Add(DataSource.SqlDataSource);
                 if (!string.IsNullOrEmpty(connectionString))
+                {
                     dialog.ConnectionString = connectionString;
+                }
 
                 if (DataConnectionDialog.Show(dialog) == DialogResult.OK)
                 {
@@ -84,14 +86,18 @@ namespace Sql2SqlCloner
         {
             var newcx = GetConnectionString(txtDestination.Text);
             if (!string.IsNullOrEmpty(newcx))
+            {
                 txtDestination.Text = newcx;
+            }
         }
 
         private void btnSource_Click(object sender, EventArgs e)
         {
             var newcx = GetConnectionString(txtSource.Text);
             if (!string.IsNullOrEmpty(newcx))
+            {
                 txtSource.Text = newcx;
+            }
         }
 
         private void btnCancel_Click(object sender, EventArgs e)

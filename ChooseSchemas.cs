@@ -392,9 +392,11 @@ namespace Sql2SqlCloner
                 Properties.Settings.Default.StopIfErrors = stopIfErrors.Checked;
                 Properties.Settings.Default.ClearDestinationDatabase = clearDestinationDatabase.Checked;
                 Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
+                Properties.Settings.Default.DisableNotForReplication = disableNotForReplication.Checked; ;
                 Properties.Settings.Default.Save();
 
-                DialogResult = new CopySchema(transfer, SelectedObjects.ToList(), CloseIfSuccess, treeView1.Nodes[0].Checked).ShowDialog();
+                DialogResult = new CopySchema(transfer, SelectedObjects.ToList(), CloseIfSuccess,
+                    treeView1.Nodes[0].Checked, disableNotForReplication.Checked).ShowDialog();
                 if (DialogResult == DialogResult.Abort)
                 {
                     Environment.Exit(0);
@@ -454,6 +456,7 @@ namespace Sql2SqlCloner
             stopIfErrors.Checked = Properties.Settings.Default.StopIfErrors;
             clearDestinationDatabase.Checked = Properties.Settings.Default.ClearDestinationDatabase;
             copyCollation.SelectedIndex = (int)Properties.Settings.Default.CopyCollation;
+            disableNotForReplication.Checked = Properties.Settings.Default.DisableNotForReplication;
 
             if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
                 btnNext_Click(sender, e);

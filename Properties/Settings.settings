@@ -29,9 +29,6 @@
     <Setting Name="CopyPermissions" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
-    <Setting Name="CopyCollation" Type="Sql2SqlCloner.Core.DataTransfer.SqlCollationAction" Scope="User">
-      <Value Profile="(Default)">Ignore</Value>
-    </Setting>
     <Setting Name="CopyFullText" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
@@ -39,6 +36,12 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="ClearDestinationDatabase" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="CopyCollation" Type="Sql2SqlCloner.Core.DataTransfer.SqlCollationAction" Scope="User">
+      <Value Profile="(Default)">Ignore_collation</Value>
+    </Setting>
+    <Setting Name="DisableNotForReplication" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
   </Settings>

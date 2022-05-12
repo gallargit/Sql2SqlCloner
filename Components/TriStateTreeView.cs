@@ -150,7 +150,9 @@ namespace Sql2SqlCloner.Components
         {
             // Node needs to check all of it's children to see if any of them are ticked or mixed
             if (tn == null)
+            {
                 return;
+            }
 
             int OrigStateImageIndex = tn.StateImageIndex;
             int UnCheckedNodes = 0, CheckedNodes = 0, MixedNodes = 0;
@@ -202,9 +204,13 @@ namespace Sql2SqlCloner.Components
             {
                 // all children are checked
                 if (tn.Checked)
+                {
                     tn.StateImageIndex = (int)CheckedState.Checked;
+                }
                 else
+                {
                     tn.StateImageIndex = (int)CheckedState.Mixed;
+                }
             }
             else if (CheckedNodes > 0)
             {
@@ -215,9 +221,13 @@ namespace Sql2SqlCloner.Components
             {
                 // all children are unchecked
                 if (tn.Checked)
+                {
                     tn.StateImageIndex = (int)CheckedState.Mixed;
+                }
                 else
+                {
                     tn.StateImageIndex = (int)CheckedState.UnChecked;
+                }
             }
 
             if (OrigStateImageIndex != tn.StateImageIndex && tn.Parent != null)

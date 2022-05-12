@@ -39,19 +39,33 @@ namespace Sql2SqlCloner
             schematransfer = initialschematransfer;
 
             if (!long.TryParse(ConfigurationManager.AppSettings["GlobalTOP"], out long GLOBALTOP))
+            {
                 GLOBALTOP = 0;
+            }
+
             if (GLOBALTOP < 0)
+            {
                 GLOBALTOP = 0;
+            }
+
             foreach (var item in list)
             {
                 long TOP = item.TopRecords;
                 var sTOP = "";
                 if (TOP <= 0)
+                {
                     TOP = GLOBALTOP;
+                }
+
                 if (GLOBALTOP > 0 && TOP > 0 && TOP > GLOBALTOP)
+                {
                     TOP = GLOBALTOP;
+                }
+
                 if (TOP > 0)
+                {
                     sTOP = $" TOP {TOP}";
+                }
 
                 var fields = " *";
                 if (convertCollation)
@@ -101,7 +115,9 @@ namespace Sql2SqlCloner
             Application.DoEvents();
 
             if (startImmediately)
+            {
                 btnNext_Click(null, null);
+            }
         }
 
         private void btnNext_Click(object sender, EventArgs e)
@@ -131,9 +147,15 @@ namespace Sql2SqlCloner
                 pause.WaitOne(Timeout.Infinite);
                 currrow++;
                 if (item.IsNewRow)
+                {
                     continue;
+                }
+
                 if (backgroundWorker1.CancellationPending)
+                {
                     break;
+                }
+
                 try
                 {
                     var tableName = item.Cells["Table"].Value.ToString();
@@ -145,15 +167,18 @@ namespace Sql2SqlCloner
                         datatransfer.EnableTableConstraints(tableName);
                     }
                     item.Cells["Status"].Value = Properties.Resources.success;
-                    item.Cells["Status"].Tag = "OK";
+                    ((System.Drawing.Bitmap)item.Cells["Status"].Value).Tag = "OK";
                 }
                 catch (Exception exc)
                 {
                     item.Cells["Status"].Value = Properties.Resources.failure;
-                    item.Cells["Status"].Tag = "ERROR";
+                    ((System.Drawing.Bitmap)item.Cells["Status"].Value).Tag = "ERROR";
                     item.Cells["Error"].Value = exc.Message;
                     if (exc.InnerException != null)
+                    {
                         item.Cells["Error"].Value = exc.InnerException.Message;
+                    }
+
                     errorCount++;
                 }
                 backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
@@ -182,9 +207,13 @@ namespace Sql2SqlCloner
                     if (autoScrollGrid.Checked)
                     {
                         if (currrow < dataGridView1.RowCount && currrow > 7 && dataGridView1.FirstDisplayedScrollingRowIndex != currrow - 8)
+                        {
                             dataGridView1.FirstDisplayedScrollingRowIndex = currrow - 8;
+                        }
                         else if (currrow < 10)
+                        {
                             dataGridView1.Refresh();
+                        }
                     }
                 }
                 if (label1.Text != currentlyCopying)
@@ -219,7 +248,10 @@ namespace Sql2SqlCloner
                     try
                     {
                         datatransfer.EnableAllDestinationConstraints();
-                        datatransfer.DisableDisabledObjects();
+                        if (ConfigurationManager.AppSettings["DisableDisabledObjects"].ToLower() == "true")
+                        {
+                            datatransfer.DisableDisabledObjects();
+                        }
                         MessageBox.Show("Success");
                         label1.Text = savelabeltext;
                     }
@@ -247,7 +279,10 @@ namespace Sql2SqlCloner
         private void btnCancel_Click(object sender, EventArgs e)
         {
             if (backgroundWorker1.IsBusy)
+            {
                 backgroundWorker1.CancelAsync();
+            }
+
             DialogResult = DialogResult.Abort;
             Environment.Exit(0);
         }
@@ -283,9 +318,14 @@ namespace Sql2SqlCloner
             foreach (DataGridViewRow row in dataGridView1.Rows)
             {
                 if (firstRow)
+                {
                     firstRow = false;
+                }
                 else
+                {
                     sb.Append(Environment.NewLine);
+                }
+
                 int counter = 0;
                 var firstCell = true;
                 foreach (DataGridViewCell cell in row.Cells)
@@ -293,15 +333,24 @@ namespace Sql2SqlCloner
                     if (counter < 4)
                     {
                         if (firstCell)
+                        {
                             firstCell = false;
+                        }
                         else
+                        {
                             sb.Append('\t');
+                        }
+
                         if (cell is DataGridViewImageCell)
                         {
                             if (cell.Value == null)
+                            {
                                 sb.Append("N/A");
+                            }
                             else
+                            {
                                 sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                            }
                         }
                         else
                         {
