@@ -216,6 +216,16 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                 foreach (var script in scripts)
                 {
+                    if (script.Contains("Incompatible object not scripted"))
+                    {
+                        var errMsg = script;
+                        if (errMsg.StartsWith("-- "))
+                        {
+                            errMsg = errMsg.Substring(3);
+                        }
+
+                        throw new Exception(errMsg);
+                    }
                     //create schema if not exists
                     var schemaname = obj.GetType().GetProperty("Schema")?.GetValue(obj, null).ToString();
                     if (!string.IsNullOrEmpty(schemaname) && !existingschemas.Contains(schemaname))

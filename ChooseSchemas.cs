@@ -68,12 +68,21 @@ namespace Sql2SqlCloner
         private string FormatCopyData(long ROWCOUNT, long TOP, string WHERE)
         {
             if (CopyOnlySchema)
+            {
                 return "";
+            }
+
             var extradata = $" ({ROWCOUNT:N0} records)";
             if (TOP > 0)
+            {
                 extradata += $", TOP {TOP}";
+            }
+
             if (!string.IsNullOrEmpty(WHERE))
+            {
                 extradata += $", {WHERE.Trim()}";
+            }
+
             return extradata;
         }
 
@@ -179,10 +188,16 @@ namespace Sql2SqlCloner
                         var currenttable = currentitem as SqlSchemaTable;
                         WHERECONDITIONS.TryGetValue(tn.Text, out string WHERE);
                         if (!string.IsNullOrEmpty(WHERE))
+                        {
                             currenttable.WhereFilter = WHERE.Trim();
+                        }
+
                         TOPROWS.TryGetValue(tn.Text, out long TOP);
                         if (TOP > 0)
+                        {
                             currenttable.TopRecords = TOP;
+                        }
+
                         if (!SelectOnlyTables && CloseIfSuccess)
                         {
                             //When copying everything add a "Copy Data" subnode to tables
@@ -206,7 +221,9 @@ namespace Sql2SqlCloner
                     }
                 }
                 if (child.Nodes.Count == 0)
+                {
                     root.Nodes.Remove(child);
+                }
             }
             root.ExpandAll();
             treeView1.SelectedNode = nodes[0];
@@ -238,9 +255,15 @@ namespace Sql2SqlCloner
             {
                 CurrentTable.TopRecords = long.Parse(defaultValue);
                 if (CurrentTable.TopRecords < 0)
+                {
                     CurrentTable.TopRecords = 0;
+                }
+
                 if (CurrentNode.Text.Contains(" ("))
+                {
                     CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" ("));
+                }
+
                 CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter);
             }
         }
@@ -252,12 +275,20 @@ namespace Sql2SqlCloner
                     .ShowDialog(ref defaultValue) == DialogResult.OK)
             {
                 if (string.IsNullOrWhiteSpace(defaultValue))
+                {
                     CurrentTable.WhereFilter = "";
+                }
                 else if (!defaultValue.StartsWith("WHERE", true, System.Globalization.CultureInfo.DefaultThreadCurrentCulture))
+                {
                     defaultValue = $"WHERE {defaultValue}";
+                }
+
                 CurrentTable.WhereFilter = defaultValue;
                 if (CurrentNode.Text.Contains(" ("))
+                {
                     CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" ("));
+                }
+
                 CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter);
             }
         }
@@ -282,7 +313,10 @@ namespace Sql2SqlCloner
         protected void SelectNodes(TreeNode root, List<string> startsWith)
         {
             if (startsWith?.Any() != true)
+            {
                 return;
+            }
+
             foreach (var node in root.Nodes)
             {
                 if (node is TreeNode)
@@ -337,9 +371,13 @@ namespace Sql2SqlCloner
                         else
                         {
                             if (item.Tag != null && item.Tag is SqlSchemaTable)
+                            {
                                 checkedItems.Add((item.Tag as SqlSchemaTable)?.Name);
+                            }
                             else
+                            {
                                 checkedItems.Add(item.Text);
+                            }
                         }
                         if (item.Parent.Text == "Table" && (SelectOnlyTables || (item.Nodes.Count > 0 && item.Nodes[0].Checked)))
                         {
@@ -351,9 +389,13 @@ namespace Sql2SqlCloner
                             else
                             {
                                 if (item.Tag != null && item.Tag is SqlSchemaTable)
+                                {
                                     checkedDataTables.Add((item.Tag as SqlSchemaTable)?.Name);
+                                }
                                 else
+                                {
                                     checkedDataTables.Add(item.Text);
+                                }
                             }
                         }
                     }
@@ -384,7 +426,10 @@ namespace Sql2SqlCloner
             {
                 Properties.Settings.Default.CopyConstraints = copyConstraints.Checked;
                 if (copyFullText.Enabled)
+                {
                     Properties.Settings.Default.CopyFullText = copyFullText.Checked;
+                }
+
                 Properties.Settings.Default.DropAndRecreateObjects = dropAndRecreateObjects.Checked;
                 Properties.Settings.Default.CopySecurity = copySecurity.Checked;
                 Properties.Settings.Default.CopyExtendedProperties = copyExtendedProperties.Checked;
@@ -459,7 +504,9 @@ namespace Sql2SqlCloner
             disableNotForReplication.Checked = Properties.Settings.Default.DisableNotForReplication;
 
             if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
+            {
                 btnNext_Click(sender, e);
+            }
         }
 
         private void copyConstraints_CheckedChanged(object sender, EventArgs e)

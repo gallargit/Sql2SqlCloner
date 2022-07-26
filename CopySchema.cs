@@ -503,6 +503,33 @@ namespace Sql2SqlCloner
 
         private void CopySchema_Load(object sender, EventArgs e)
         {
+            if (Properties.Settings.Default.ClearDestinationDatabase)
+            {
+                if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"] != null)
+                {
+                    if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"].ToLowerInvariant().Equals("true"))
+                    {
+                        var server = transfer.destinationConnection.SqlConnectionObject.DataSource;
+                        if (server == ".")
+                        {
+                            server = "localhost";
+                        }
+
+                        if (MessageBox.Show("The database " +
+                            server + "." +
+                            transfer.destinationConnection.DatabaseName +
+                            " is about to be cleared. Continue?",
+                            "Database deletion",
+                            MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+                        {
+                            DialogResult = DialogResult.Cancel;
+                            Environment.Exit(0);
+                            return;
+                        }
+                    }
+                }
+            }
+
             Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
             dataGridView1.Columns[0].Width = 40;
             dataGridView1.Columns[3].Width = 62;
