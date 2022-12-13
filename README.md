@@ -2,7 +2,7 @@
 SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject.com/Articles/994806/SQL-Server-Database-Cloning-Tool-using-Csharp)
 
 # Features
-* Copy a SQL Server database from one server to another (schema and/or data). Many enhancements were made over the original tool.
+* Copy a SQL Server database from one server to another (schema and/or data). Many enhancements were made over the original tool. Works with SQL Server 2005 or greater.
 
 * New features (some of them can be configured at the `app.config` file):  
   * Copy several schemas
@@ -16,6 +16,7 @@ SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject
   * Copy users and permissions (GRANT)
   * Convert database collation option
   * Copy system-versioned tables
+  * Copy change-tracking tables
   * Some Azure-specific modifications  
 
 * Fixes:
@@ -32,7 +33,7 @@ You can select a number of options in the screens, tables can be right-clicked s
 Many tests were doing using Microsoft's sample Adventure Works database, which can be downloaded here:
 https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2019.bak
 
-In the `app.config` file some objects are included to demonstrate how to parametrize the application
+In the `app.config` file some parameters are included to demonstrate how to parametrize the application
 
 # To be done
 * Ability to decrypt encrypted objects using DAC connection

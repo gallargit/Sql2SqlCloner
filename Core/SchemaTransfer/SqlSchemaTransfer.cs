@@ -29,7 +29,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         public List<SqlSchemaObject> SourceObjects { get; private set; }
         public List<SqlSchemaObject> DestinationObjects { get; private set; }
         public List<SqlSchemaObject> RecreateObjects { get; } = new List<SqlSchemaObject>();
-        public List<string> RecreateObjectsExtendedDescriptions { get; } = new List<string>();
+
         public bool IncludeExtendedProperties
         {
             get
@@ -72,6 +72,17 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             set
             {
                 transfer.Options.NoCollation = value;
+            }
+        }
+        public bool IgnoreFileGroup
+        {
+            get
+            {
+                return transfer.Options.NoFileGroup;
+            }
+            set
+            {
+                transfer.Options.NoFileGroup = value;
             }
         }
 
@@ -132,6 +143,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
         private void ResetTransfer()
         {
+            transfer.Options.NoFileGroup = true;
             transfer.CopyAllDatabaseTriggers = false;
             transfer.CopyAllDefaults = false;
             transfer.CopyAllLogins = false;
@@ -157,18 +169,22 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             transfer.SourceTranslateChar = false;
         }
 
-        private void CreateLogin(string login)
+        private void CreateLogin(string login, string password = null)
         {
             const string sql = @"IF NOT EXISTS
                 (SELECT name FROM master.sys.server_principals WHERE name = '{0}')
                 BEGIN
-                    CREATE LOGIN [{0}] WITH PASSWORD = N'{1}'
+                    CREATE LOGIN [{0}] WITH PASSWORD=N'{1}'
                 END";
-            new SqlCommand(string.Format(sql, login, ConfigurationManager.AppSettings["DefaultPassword"] ?? "D3F@u1TP@s$W0rd!"),
+            new SqlCommand(string.Format(sql, login,
+                string.IsNullOrWhiteSpace(password) ?
+                    (ConfigurationManager.AppSettings["DefaultPassword"] ?? "D3F@u1TP@s$W0rd!")
+                    : password),
                 destinationConnection.SqlConnectionObject).ExecuteNonQuery();
         }
 
-        public void CreateObject(NamedSmoObject obj, bool dropIfExists, bool overrideCollation, bool useSourceCollation)
+        public void CreateObject(NamedSmoObject obj, bool dropIfExists, bool overrideCollation, bool useSourceCollation,
+            bool alterInsteadOfCreate, bool? removeSchemaBinding)
         {
             using (SqlCommand command = new SqlCommand())
             {
@@ -179,6 +195,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     return;
                 }
+
                 ResetTransfer();
                 transfer.ObjectList.Clear();
                 transfer.ObjectList.Add(obj);
@@ -205,10 +222,22 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 bool copyAzureUserToNonAzureDB = (obj is User) &&
                     sourceServer.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase && destinationServer.DatabaseEngineType != DatabaseEngineType.SqlAzureDatabase;
                 //system-versioned tables should have their PK created right away
-                transfer.Options.DriPrimaryKey = obj is Table table && (table.IsSystemVersioned || table.IsMemoryOptimized);
+                transfer.Options.DriPrimaryKey = obj is Table table && (GetTableProperty(table, "IsSystemVersioned") || GetTableProperty(table, "IsMemoryOptimized"));
                 transfer.Options.IncludeIfNotExists = obj is Schema;
 
                 var scripts = transfer.ScriptTransfer();
+                var incompatibleErrorMsg = "";
+                if (transfer.IncompatibleObjects.Count > 0)
+                {
+                    incompatibleErrorMsg = "Incompatible subitems in this object:";
+                    foreach (var incobj in transfer.IncompatibleObjects)
+                    {
+                        incompatibleErrorMsg += " " + incobj.Value.Substring(6 + incobj.Value.LastIndexOf("@Name="));
+                        incompatibleErrorMsg = incompatibleErrorMsg.Substring(0, incompatibleErrorMsg.Length - 1) + " (" + incobj.Type + ")";
+                    }
+                    transfer.IncompatibleObjects.Clear();
+                }
+
                 if (scripts.Count == 0)
                 {
                     throw new Exception($"Could not script object {namewithschema}");
@@ -218,13 +247,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     if (script.Contains("Incompatible object not scripted"))
                     {
-                        var errMsg = script;
-                        if (errMsg.StartsWith("-- "))
-                        {
-                            errMsg = errMsg.Substring(3);
-                        }
-
-                        throw new Exception(errMsg);
+                        continue;
                     }
                     //create schema if not exists
                     var schemaname = obj.GetType().GetProperty("Schema")?.GetValue(obj, null).ToString();
@@ -234,15 +257,31 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         command.CommandText = $"IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = N'{schemaname}') EXEC('CREATE SCHEMA [{schemaname}]')";
                         command.ExecuteNonQuery();
                     }
-                    var scriptRun = script;
-                    while (scriptRun.StartsWith("\n") || scriptRun.StartsWith("\r"))
+                    var scriptRun = ConvertScriptProperCase(script, obj);
+                    if (alterInsteadOfCreate)
                     {
-                        scriptRun = scriptRun.Substring(1);
+                        if (scriptRun.StartsWith("CREATE", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            scriptRun = "ALTER" + scriptRun.Substring(6);
+                        }
+                        if (removeSchemaBinding.HasValue)
+                        {
+                            if (removeSchemaBinding.Value)
+                            {
+                                scriptRun = scriptRun.Replace("WITH SCHEMABINDING", "/*WITH SCHEMABINDING*/");
+                            }
+                        }
                     }
 
-                    if (scriptRun.StartsWith("CREATE USER"))
+                    if (scriptRun.StartsWith("CREATE USER", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        CreateLogin(obj.Name);
+                        string password = null;
+                        if (scriptRun.Contains("WITH PASSWORD="))
+                        {
+                            password = scriptRun.Substring(16 + scriptRun.IndexOf("WITH PASSWORD"));
+                            password = password.Substring(0, password.IndexOf("',"));
+                        }
+                        CreateLogin(obj.Name, password);
                         if (copyAzureUserToNonAzureDB)
                         {
                             scriptRun = scriptRun.Replace(" FROM EXTERNAL PROVIDER", "").Replace(" FROM  EXTERNAL PROVIDER", "");
@@ -254,21 +293,35 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         {
                             //change Collation for all objects: script.Replace("Latin1_General_100_CI_AS_SC_UTF8", "SQL_Latin1_General_CP1_CI_AS")
                             var indexCollate = scriptRun.IndexOf(" COLLATE ");
+
                             while (indexCollate > 0)
                             {
                                 var scriptRun1 = scriptRun.Substring(0, indexCollate + 9);
                                 var scriptRun2 = scriptRun.Substring(indexCollate + 9);
-                                while (scriptRun2.Substring(0, 1) == " ")
+                                //prevent collate replacement for strings like ' COLLATE ' (with quotes)
+                                var checkQuote = false;
+                                try
                                 {
-                                    scriptRun2 = scriptRun2.Substring(1);
+                                    checkQuote = scriptRun1.Substring(scriptRun1.Length - 15).Substring(0, 7).
+                                    ToCharArray().ToList().Contains('\'');
+                                    checkQuote = scriptRun2.Substring(0, 5).
+                                    ToCharArray().ToList().Contains('\'');
                                 }
-                                while (scriptRun2.Substring(0, 1) != " ")
+                                catch { }
+                                if (!checkQuote && !scriptRun2.StartsWith("database_default", StringComparison.InvariantCultureIgnoreCase))
                                 {
-                                    scriptRun2 = scriptRun2.Substring(1);
+                                    while (scriptRun2.Substring(0, 1) == " ")
+                                    {
+                                        scriptRun2 = scriptRun2.Substring(1);
+                                    }
+                                    while (scriptRun2.Substring(0, 1) != " " && scriptRun2.Substring(0, 1) != "," && scriptRun2.Substring(0, 1) != ")" && scriptRun2.Substring(0, 1) != "\r" && scriptRun2.Substring(0, 1) != "\n")
+                                    {
+                                        scriptRun2 = scriptRun2.Substring(1);
+                                    }
+                                    scriptRun = scriptRun1 +
+                                        (useSourceCollation ? sourceDatabase.Collation : destinationDatabase.Collation)
+                                        + scriptRun2;
                                 }
-                                scriptRun = scriptRun1 +
-                                    (useSourceCollation ? sourceDatabase.Collation : destinationDatabase.Collation)
-                                    + scriptRun2;
                                 indexCollate = scriptRun.IndexOf(" COLLATE ", scriptRun1.Length);
                             }
                         }
@@ -289,7 +342,173 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         //non-existing roles will get their permissions later, do not fail
                     }
                 }
+                if (!string.IsNullOrEmpty(incompatibleErrorMsg))
+                {
+                    throw new Exception(incompatibleErrorMsg);
+                }
             }
+        }
+
+        private string GetTypeDescription(string objType)
+        {
+            switch (objType)
+            {
+                case "SqlAssembly":
+                    return "ASSEMBLY";
+                case "FullTextCatalog":
+                    return "FULLTEXT CATALOG";
+                case "FullTextStopList":
+                    return "FULLTEXT STOPLIST";
+                case "DatabaseRole":
+                    return "ROLE";
+                case "UserDefinedDataType":
+                    return "TYPE";
+                case "UserDefinedTableType":
+                    return "TYPE";
+                case "XmlSchemaCollection":
+                    return "XML SCHEMA COLLECTION";
+                case "StoredProcedure":
+                    return "PROCEDURE";
+                case "UserDefinedFunction":
+                    return "FUNCTION";
+                case "PartitionFunction":
+                    return "PARTITION FUNCTION";
+                case "PartitionScheme":
+                    return "PARTITION SCHEME";
+                case "ExternalDataSource":
+                    return "EXTERNAL DATA SOURCE";
+                case "ColumnMasterKey":
+                    return "COLUMN MASTER KEY";
+                case "ColumnEncryptionKey":
+                    return "COLUMN ENCRYPTION KEY";
+            }
+            return objType.ToUpperInvariant();
+        }
+
+        private string ConvertScriptProperCase(string oldScript, NamedSmoObject obj)
+        {
+            var typeName = GetTypeDescription(obj.GetType().Name);
+            var newScript = oldScript;
+            if (newScript.StartsWith("SET"))
+            {
+                return newScript;
+            }
+            var newline = new[] { '\n', '\r' };
+            var separators = new[] { '\n', '\r', '\t', ' ', '(' };
+            var separatorsExtended = new[] { '\n', '\r', '\t', ' ', '(', '[' };
+            while (separators.Contains(newScript[0]))
+            {
+                newScript = newScript.Substring(1);
+            }
+            if ((obj is ColumnMasterKey || obj is ColumnEncryptionKey) &&
+                newScript.StartsWith("USE", StringComparison.InvariantCultureIgnoreCase))
+            {
+                while (!newline.Contains(newScript[0]))
+                {
+                    newScript = newScript.Substring(1);
+                }
+                while (separators.Contains(newScript[0]))
+                {
+                    newScript = newScript.Substring(1);
+                }
+            }
+            //CREATE
+            if (newScript.StartsWith("CREATE", StringComparison.InvariantCultureIgnoreCase))
+            {
+                newScript = newScript.Substring(6);
+                while (separators.Contains(newScript[0]))
+                {
+                    newScript = newScript.Substring(1);
+                }
+                //remove TABLE VIEW PROCEDURE...
+                var spacesInName = typeName.Split(' ').Length;
+                while (spacesInName > 0)
+                {
+                    while (!separatorsExtended.Contains(newScript[0]) && spacesInName > 0)
+                    {
+                        newScript = newScript.Substring(1);
+                    }
+                    spacesInName--;
+                    if (spacesInName > 0)
+                    {
+                        newScript = newScript.Substring(1);
+                    }
+                }
+                while (separators.Contains(newScript[0]))
+                {
+                    newScript = newScript.Substring(1);
+                }
+                //remove name
+                if (newScript.StartsWith("["))
+                {
+                    while (newScript[0] != ']')
+                    {
+                        newScript = newScript.Substring(1);
+                    }
+                    newScript = newScript.Substring(1);
+                    if (newScript.Length > 0)
+                    {
+                        if (newScript.StartsWith("."))
+                        {
+                            //this was the schema name, remove the object name
+                            newScript = newScript.Substring(1);
+                            if (newScript.StartsWith("["))
+                            {
+                                while (newScript[0] != ']')
+                                {
+                                    newScript = newScript.Substring(1);
+                                }
+                                newScript = newScript.Substring(1);
+                            }
+                            else
+                            {
+                                while (!separators.Contains(newScript[0]) && !newScript.StartsWith("--"))
+                                {
+                                    newScript = newScript.Substring(1);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            while (!separators.Contains(newScript[0]))
+                            {
+                                newScript = newScript.Substring(1);
+                            }
+                        }
+                    }
+                }
+                if (newScript.Length > 0)
+                {
+                    if (!newScript.StartsWith("@") && !newScript.StartsWith("("))
+                    {
+                        if (!newScript.StartsWith("--") && !newScript.StartsWith("/*"))
+                        {
+                            while (!separators.Contains(newScript[0]))
+                            {
+                                if (newScript.StartsWith("\""))
+                                {
+                                    newScript = newScript.Substring(1);
+                                    newScript = newScript.Substring(1 + newScript.IndexOf("\""));
+                                }
+                                else
+                                {
+                                    if (newScript[0] != '@')
+                                    {
+                                        newScript = newScript.Substring(1);
+                                    }
+                                    else
+                                    {
+                                        newScript = " " + newScript;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                //new CREATE sentence
+                newScript = "CREATE " + typeName + " " + obj.ToString() + newScript;
+            }
+            return newScript;
         }
 
         public void CopyExtendedProperties(IEnumerable<NamedSmoObject> namedSmoObjects)
@@ -432,7 +651,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     try
                     {
-                        CreateObject(property, true, false, false);
+                        CreateObject(property, true, false, false, false, null);
                     }
                     catch
                     {
@@ -442,90 +661,57 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
 
             //Clustered indexes properties cannot be obtained via SMO, do a direct copy instead
-            CopyToDestination(@"SELECT
-                'EXEC sys.sp_addextendedproperty N''MS_Description'', N''' + CONVERT(VARCHAR(2000), p.[value]) + ''', ''SCHEMA'', N''' + OBJECT_SCHEMA_NAME(i.object_id) + ''', ''TABLE'', N''' + sys.tables.name + ''', ''INDEX'', N''' + i.[name]+ ''''
-                FROM sys.indexes i INNER JOIN sys.extended_properties P ON P.major_id=i.object_id AND P.minor_id=i.index_id
-                INNER JOIN sys.tables ON sys.tables.object_id = i.object_id
-                WHERE p.class=7
-                AND (i.type=1 OR is_primary_key=1)");
+            CopyToDestination(@"SELECT 'EXEC sys.sp_addextendedproperty N''MS_Description'', N''' + CONVERT(VARCHAR(2000), p.[value]) + ''', ''SCHEMA'', N''' +
+                QUOTENAME(SCHEMA_NAME(t.schema_id)) + ''', ''TABLE'', N''' + t.name + ''', ''INDEX'', N''' + i.[name]+ ''''
+                FROM sys.indexes i INNER JOIN sys.extended_properties p ON p.major_id=i.object_id AND p.minor_id=i.index_id
+                INNER JOIN sys.tables t ON t.object_id = i.object_id
+                WHERE p.class=7 AND (i.type=1 OR is_primary_key=1)");
         }
 
-        public void RemoveDestinationSchemaBoundObjects()
+        public void RemoveSchemaBindingFromDestination()
         {
             RecreateObjects.Clear();
-            RecreateObjectsExtendedDescriptions.Clear();
             RefreshDestinationObjects();
-            foreach (var obj in DestinationObjects.Where(o => o.Object is View))
+            foreach (var obj in DestinationObjects.Where(o => o.Object != null && (
+                (o.Object is View && (o.Object as View).IsSchemaBound) ||
+                (o.Object is UserDefinedFunction && (o.Object as UserDefinedFunction).IsSchemaBound) ||
+                (o.Object is StoredProcedure && (o.Object as StoredProcedure).IsSchemaBound))
+            ))
             {
-                if (((View)obj.Object).IsSchemaBound)
+                RecreateObjects.Add(SourceObjects.Single(s => s.Name == obj.Name && s.Type == obj.Type));
+                try
                 {
-                    RecreateObjects.Add(SourceObjects.Single(s => s.Name == obj.Name && s.Type == obj.Type));
-                    foreach (Index srcindex in ((View)obj.Object).Indexes)
+                    if (DestinationObjects.Any(d => d.Type == obj.Type && d.Name == obj.Name))
                     {
-                        foreach (ExtendedProperty ep in srcindex.ExtendedProperties)
-                        {
-                            if (ep.Name == "MS_Description")
-                            {
-                                RecreateObjectsExtendedDescriptions.Add($"EXEC sys.sp_addextendedproperty N'MS_Description', N'{ep.Value.ToString().Replace("'", "''")}', 'SCHEMA', N'{((View)obj.Object).Schema}', 'VIEW', N'{((View)obj.Object).Name}', 'INDEX', N'{srcindex.Name}'");
-                            }
-                        }
+                        CreateObject(obj.Object, false, false, false, true, true);
                     }
                 }
-            }
-
-            foreach (var obj in DestinationObjects.Where(o => o.Object is UserDefinedFunction))
-            {
-                if (((UserDefinedFunction)obj.Object).IsSchemaBound)
+                catch //"not found"
                 {
-                    RecreateObjects.Add(SourceObjects.Single(s => s.Name == obj.Name && s.Type == obj.Type));
                 }
             }
-
-            foreach (var obj in DestinationObjects.Where(o => o.Object is StoredProcedure))
-            {
-                if (((StoredProcedure)obj.Object).IsSchemaBound)
-                {
-                    RecreateObjects.Add(SourceObjects.Single(s => s.Name == obj.Name && s.Type == obj.Type));
-                }
-            }
-            if (RecreateObjects.Count > 0)
-            {
-                ClearDestinationDatabase(RecreateObjects);
-            }
+            RefreshDestinationObjects();
         }
 
-        public void RecreateDestinationSchemaBoundObjects()
+        public void ReAddSchemaBindingToDestination()
         {
-            foreach (var item in RecreateObjects.ToList())
+            var previousErrors = -1;
+            var currentErrors = 0;
+            while (currentErrors != previousErrors)
             {
-                try
+                previousErrors = currentErrors;
+                currentErrors = 0;
+                foreach (var item in RecreateObjects)
                 {
-                    if (!DestinationObjects.Any(d => d.Type == item.Type && d.Name == item.Name))
+                    try
                     {
-                        CreateObject(item.Object, false, false, false);
+                        CreateObject(item.Object, false, false, false, true, false);
+                    }
+                    catch
+                    {
+                        currentErrors++;
                     }
                 }
-                catch (Exception ex) when (ex.Message.StartsWith("There is already an object"))
-                {
-                    RecreateObjects.Remove(item);
-                }
-            }
-            RefreshDestinationObjects();
-            foreach (var item in RecreateObjects.Where(i => i.Type == "Table" || i.Type == "View").ToList())
-            {
-                try
-                {
-                    ApplyIndexes(item.Object, Properties.Settings.Default.CopyFullText && Properties.Settings.Default.CopyConstraints);
-                }
-                catch
-                {
-                    throw;
-                }
-            }
-
-            foreach (var extendeddesc in RecreateObjectsExtendedDescriptions)
-            {
-                new SqlCommand(extendeddesc, destinationConnection.SqlConnectionObject).ExecuteNonQuery();
             }
         }
 
@@ -557,12 +743,27 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                    ON DRM.role_principal_id = DP1.principal_id
                 LEFT OUTER JOIN sys.database_principals AS DP2
                    ON DRM.member_principal_id = DP2.principal_id
-                WHERE DP1.type='R' AND dp1.is_fixed_role=0 AND dp2.is_fixed_role=0");
+                WHERE DP1.type='R' AND DP1.is_fixed_role=0 AND DP2.is_fixed_role=0");
         }
 
         private List<SqlSchemaObject> GetSqlObjects(ServerConnection connection, Database db)
         {
             var items = new List<SqlSchemaObject>();
+            var isRunningMinimumSQL2008 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
+            if (!isRunningMinimumSQL2008)
+            {
+                isRunningMinimumSQL2008 = db.Version >= SQL_2008_Version;
+            }
+            var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
+            if (!isRunningMinimumSQL2012)
+            {
+                isRunningMinimumSQL2012 = db.Version >= SQL_2012_Version;
+            }
+            var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
+            if (!isRunningMinimumSQL2016)
+            {
+                isRunningMinimumSQL2016 = db.Version >= SQL_2016_Version;
+            }
 
             foreach (SqlAssembly item in db.Assemblies)
             {
@@ -576,11 +777,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
 
-            var isRunningMinimumSQL2008 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2008)
-            {
-                isRunningMinimumSQL2008 = db.Version >= SQL_2008_Version;
-            }
             if (isRunningMinimumSQL2008)
             {
                 foreach (FullTextStopList item in db.FullTextStopLists)
@@ -658,6 +854,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
+            foreach (Synonym item in db.Synonyms)
+            {
+                items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
+            }
             if (token.IsCancellationRequested)
             {
                 return items;
@@ -672,11 +872,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
-            var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2012)
-            {
-                isRunningMinimumSQL2012 = db.Version >= SQL_2012_Version;
-            }
             if (isRunningMinimumSQL2012)
             {
                 foreach (Sequence item in db.Sequences)
@@ -734,22 +929,43 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
+            if (isRunningMinimumSQL2016)
+            {
+                foreach (ColumnMasterKey item in db.ColumnMasterKeys)
+                {
+                    items.Add(new SqlSchemaObject { Name = $"{item.Name}", Object = item, Type = item.GetType().Name });
+                }
+                if (token.IsCancellationRequested)
+                {
+                    return items;
+                }
+                foreach (ColumnEncryptionKey item in db.ColumnEncryptionKeys)
+                {
+                    items.Add(new SqlSchemaObject { Name = $"{item.Name}", Object = item, Type = item.GetType().Name });
+                }
+                if (token.IsCancellationRequested)
+                {
+                    return items;
+                }
+            }
+
             foreach (Table item in db.Tables)
             {
                 var tableName = $"{item.Schema}.{item.Name}";
                 if (!item.IsSystemObject || alwaysIncludeTablesList.Any(s => s.Equals(tableName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    items.Add(new SqlSchemaTable
+                    var table = new SqlSchemaTable
                     {
                         Name = tableName,
                         Object = item,
                         Type = item.GetType().Name,
                         RowCount = dicTables[tableName],
                         HasRelationships = item.ForeignKeys.Count > 0
-                    });
+                    };
+                    items.Add(table);
                     foreach (Trigger trigger in item.Triggers)
                     {
-                        items.Add(new SqlSchemaObject { Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
+                        items.Add(new SqlSchemaObject { Parent = table, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
                     }
                 }
             }
@@ -763,13 +979,18 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 if (!item.IsSystemObject)
                 {
-                    items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                    var view = new SqlSchemaObject
+                    {
+                        Name = $"{item.Schema}.{item.Name}",
+                        Object = item,
+                        Type = item.GetType().Name
+                    };
+                    items.Add(view);
+                    foreach (Trigger trigger in item.Triggers)
+                    {
+                        items.Add(new SqlSchemaObject { Parent = view, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
+                    }
                 }
-            }
-            var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2016)
-            {
-                isRunningMinimumSQL2016 = db.Version >= SQL_2016_Version;
             }
             if (isRunningMinimumSQL2016)
             {
@@ -817,39 +1038,107 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             return items;
         }
 
-        private TableViewBase GetDestinationTableOrViewByName(NamedSmoObject sTable)
+        private TableViewBase GetDestinationTableOrViewByName(NamedSmoObject obj)
         {
-            foreach (Table t in destinationDatabase.Tables)
+            if (obj is Table tb)
             {
-                if (t.Schema == (sTable as Table)?.Schema && t.Name == (sTable as Table)?.Name)
+                try
                 {
-                    return t;
+                    return destinationDatabase.Tables[tb.Name, tb.Schema];
+                }
+                catch
+                {
+                    throw new Exception($"Table {tb.Owner}.{tb.Schema} not found");
                 }
             }
-
-            foreach (View v in destinationDatabase.Views)
+            else
             {
-                if (v.Schema == (sTable as View)?.Schema && v.Name == (sTable as View)?.Name)
+                var vw = obj as View;
+                try
                 {
-                    return v;
+                    return destinationDatabase.Views[vw.Name, vw.Schema] ??
+                        (TableViewBase)destinationDatabase.Views[vw.Name, vw.Owner];
+                }
+                catch
+                {
+                    throw new Exception($"View {vw.Owner}.{vw.Name} not found");
                 }
             }
-
-            throw new Exception($"Table/View {(sTable as Table)?.Owner}.{(sTable as Table)?.Name} not found");
         }
 
-        public void ApplyIndexes(NamedSmoObject sTable, bool CopyFullText)
+        public bool GetTableProperty(Table t, string propertyName)
         {
-            var destinationTable = GetDestinationTableOrViewByName(sTable);
-            foreach (Index srcindex in (sTable as TableViewBase)?.Indexes)
+            Database db = t.Parent;
+            var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
+            if (!isRunningMinimumSQL2012)
             {
+                isRunningMinimumSQL2012 = db.Version >= SQL_2012_Version;
+            }
+            var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
+            if (!isRunningMinimumSQL2016)
+            {
+                isRunningMinimumSQL2016 = db.Version >= SQL_2016_Version;
+            }
+            if (propertyName == nameof(t.ChangeTrackingEnabled) && !isRunningMinimumSQL2012)
+            {
+                return false;
+            }
+            else if ((propertyName == nameof(t.IsMemoryOptimized) || propertyName == nameof(t.IsSystemVersioned))
+                && !isRunningMinimumSQL2016)
+            {
+                return false;
+            }
+            else
+            {
+                return (bool)t.GetType().GetProperty(propertyName).GetValue(t);
+            }
+        }
+        public void ApplyIndexes(NamedSmoObject obj, bool CopyFullText)
+        {
+            var destinationTable = GetDestinationTableOrViewByName(obj);
+            if (destinationTable == null)
+            {
+                return;
+            }
+            //clustered indexes should be processed first
+            var indexesSorted = new List<Index>();
+            foreach (Index srcindex in (obj as TableViewBase)?.Indexes)
+            {
+                if (srcindex.IndexType == IndexType.ClusteredIndex)
+                {
+                    indexesSorted.Insert(0, srcindex);
+                }
+                else
+                {
+                    indexesSorted.Add(srcindex);
+                }
+            }
+            foreach (Index srcindex in indexesSorted)
+            {
+                var existingIndex = false;
+                if (obj is View)
+                {
+                    foreach (Index destIndex in (destinationTable as View)?.Indexes)
+                    {
+                        if (destIndex.Name == srcindex.Name)
+                        {
+                            //index already exists in this view
+                            existingIndex = true;
+                            break;
+                        }
+                    }
+                }
+                if (existingIndex)
+                {
+                    continue;
+                }
                 //primary keys for system-versioned tables are already created
-                if (destinationTable is Table table && (table.IsSystemVersioned && !table.IsMemoryOptimized)
+                if (destinationTable is Table table && GetTableProperty(table, "IsSystemVersioned") && !GetTableProperty(table, "IsMemoryOptimized")
                     && (srcindex.IndexKeyType == IndexKeyType.DriPrimaryKey))
                 {
                     continue;
                 }
-                if (destinationTable is Table table2 && (table2.IsMemoryOptimized))
+                if (destinationTable is Table table2 && GetTableProperty(table2, "IsMemoryOptimized"))
                 {
                     continue;
                 }
@@ -866,8 +1155,15 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         PadIndex = srcindex.PadIndex,
                         FillFactor = srcindex.FillFactor,
                         DisallowPageLocks = srcindex.DisallowPageLocks,
-                        DisallowRowLocks = srcindex.DisallowRowLocks
+                        DisallowRowLocks = srcindex.DisallowRowLocks,
                     };
+
+                    //FilterDefinition property is not available for all SQL Server editions
+                    try
+                    {
+                        index.FilterDefinition = srcindex.FilterDefinition;
+                    }
+                    catch { }
 
                     if (!string.IsNullOrEmpty(srcindex.FileGroup))
                     {
@@ -905,11 +1201,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         index.IndexType = srcindex.IndexType;
                     }
 
-                    if (sTable is Table && destinationDatabase.Tables[sTable.Name]?.FileGroup != null)
+                    if (obj is Table && destinationDatabase.Tables[obj.Name]?.FileGroup != null)
                     {
-                        index.FileGroup = destinationDatabase.Tables[sTable.Name].FileGroup;
+                        index.FileGroup = destinationDatabase.Tables[obj.Name].FileGroup;
                     }
-
                     index.Create();
                 }
                 catch
@@ -917,9 +1212,22 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     throw;
                 }
             }
+            if (obj is Table sTab && GetTableProperty(sTab, "ChangeTrackingEnabled"))
+            {
+                /*
+                this does not work, direct SQL is used instead
+                (GetDestinationTableOrViewByName(sTable) as Table).ChangeTrackingEnabled = true;
+                if (sTab.TrackColumnsUpdatedEnabled)
+                {
+                    (GetDestinationTableOrViewByName(sTable) as Table).TrackColumnsUpdatedEnabled = true;
+                }
+                */
+                new SqlCommand($"ALTER TABLE {obj} ENABLE CHANGE_TRACKING WITH(TRACK_COLUMNS_UPDATED = {(sTab.TrackColumnsUpdatedEnabled ? "ON" : "OFF")})", destinationConnection.SqlConnectionObject).ExecuteNonQuery();
+            }
+
             if (CopyFullText)
             {
-                FullTextIndex fulltextind = (sTable as TableViewBase)?.FullTextIndex;
+                FullTextIndex fulltextind = (obj as TableViewBase)?.FullTextIndex;
                 if (fulltextind != null)
                 {
                     try
@@ -927,7 +1235,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         FullTextIndex index = new FullTextIndex(destinationTable)
                         {
                             CatalogName = fulltextind.CatalogName,
-                            ChangeTracking = fulltextind.ChangeTracking,
                             FilegroupName = fulltextind.FilegroupName,
                             SearchPropertyListName = fulltextind.SearchPropertyListName,
                             StopListName = fulltextind.StopListName,
@@ -953,13 +1260,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public void ApplyForeignKeys(NamedSmoObject sTable, bool disableNotForReplication)
+        public void ApplyForeignKeys(NamedSmoObject obj, bool disableNotForReplication)
         {
-            foreach (ForeignKey sourcefk in (sTable as Table)?.ForeignKeys)
+            foreach (ForeignKey sourcefk in (obj as Table)?.ForeignKeys)
             {
                 try
                 {
-                    ForeignKey foreignkey = new ForeignKey(GetDestinationTableOrViewByName(sTable) as Table, sourcefk.Name)
+                    ForeignKey foreignkey = new ForeignKey(GetDestinationTableOrViewByName(obj) as Table, sourcefk.Name)
                     {
                         DeleteAction = sourcefk.DeleteAction,
                         IsChecked = sourcefk.IsChecked,
@@ -984,13 +1291,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public void ApplyChecks(NamedSmoObject sTable, bool disableNotForReplication)
+        public void ApplyChecks(NamedSmoObject obj, bool disableNotForReplication)
         {
-            foreach (Check chkConstr in (sTable as Table)?.Checks)
+            foreach (Check chkConstr in (obj as Table)?.Checks)
             {
                 try
                 {
-                    new Check(GetDestinationTableOrViewByName(sTable), chkConstr.Name)
+                    new Check(GetDestinationTableOrViewByName(obj), chkConstr.Name)
                     {
                         IsChecked = chkConstr.IsChecked,
                         IsEnabled = chkConstr.IsEnabled,
@@ -1066,7 +1373,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             tskDestination.Wait();
         }
 
-        public void ClearDestinationDatabase(List<SqlSchemaObject> lstDelete = null)
+        public void ClearDestinationDatabase(List<SqlSchemaObject> lstDelete = null, Action<NamedSmoObject> callback = null)
         {
             var lastError = "";
             if (DestinationObjects.Count == 0 || lstDelete?.Count == 0)
@@ -1097,7 +1404,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     //get all objects to remove placing schemas at the end
                     destinations = transferDrop.DestinationObjects.ConvertAll(o => o.Object).Where(p => !(p is Schema))
-
                            .Union(transferDrop.DestinationObjects.ConvertAll(s => s.Object)
                            .Where(t => t is Schema)).ToList();
                 }
@@ -1117,18 +1423,18 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             command.CommandTimeout = SqlTimeout;
                             if (lstDelete == null)
                             {
-                                foreach (Table table in transferDrop.DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object))
+                                foreach (Table table in transferDrop.DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object).Cast<Table>())
                                 {
                                     if (token.IsCancellationRequested)
                                     {
                                         return;
                                     }
 
-                                    if (table.IsSystemVersioned)
+                                    if (GetTableProperty(table, "IsSystemVersioned"))
                                     {
                                         table.IsSystemVersioned = false;
                                     }
-                                    if (table.IsMemoryOptimized)
+                                    if (GetTableProperty(table, "IsMemoryOptimized"))
                                     {
                                         table.IsMemoryOptimized = false;
                                     }
@@ -1159,6 +1465,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                             command.ExecuteNonQuery();
                                             destinations.Remove(obj);
                                             processed++;
+                                            callback?.Invoke(obj);
                                         }
                                     }
                                     catch (Exception ex)
@@ -1193,7 +1500,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         }
                         catch { }
                     }
-                    catch { }
+                    catch
+                    {
+                        throw;
+                    }
                     //refresh local object before exiting
                     RefreshDestinationObjects();
                     if (lstDelete == null)

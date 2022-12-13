@@ -4,6 +4,7 @@ using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -54,6 +55,7 @@ namespace Sql2SqlCloner
                 Environment.Exit(0);
                 return;
             }
+            CopyList.ForEach(c => c.Status = Properties.Resources.empty);
             dataGridView1.DataSource = CopyList;
 
             label1.Text = "Click on the 'Copy' button to start copying below listed SQL objects";
@@ -85,23 +87,51 @@ namespace Sql2SqlCloner
             backgroundWorker1.RunWorkerAsync();
         }
 
+        public void DeleteCallback(NamedSmoObject currObject)
+        {
+            var item = dataGridView1.Rows[0].DataBoundItem as SqlSchemaObject;
+            if (item.Name.Length >= 20)
+            {
+                item.Name = "Clearing database";
+            }
+            item.Name += ".";
+            item.Type = currObject.GetType().Name;
+            item.Object = currObject;
+
+            dataGridView1.Invoke(new Action(() => dataGridView1.Refresh()));
+        }
+
         private void backgroundWorker1_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
         {
             if (Properties.Settings.Default.ClearDestinationDatabase)
             {
-                CopyList.FirstOrDefault().Status = Properties.Resources.waiting;
+                var CopyListBack = CopyList.ToList();
+                CopyList.Clear();
+                CopyList.Add(new SqlSchemaObject
+                {
+                    Name = "Clearing database",
+                    Type = "Database",
+                    Object = new Database() { Name = transfer.destinationConnection.DatabaseName },
+                    Status = Properties.Resources.waiting
+                });
+
+                RefreshDataGrid();
+
                 currentlyCopying = "Clearing destination database...";
                 backgroundWorker1.ReportProgress(0);
                 try
                 {
-                    transfer.ClearDestinationDatabase();
+                    transfer.ClearDestinationDatabase(callback: DeleteCallback);
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
-                CopyList.FirstOrDefault().Status = null;
+                CopyList.Clear();
+                CopyList.AddRange(CopyListBack);
+                RefreshDataGrid();
             }
+            backgroundWorker1.ReportProgress(0);
             currentlyCopying = "Processing schema...";
             bool overrideCollation = false, useSourceCollation = false;
             transfer.NoCollation = false;
@@ -129,6 +159,7 @@ namespace Sql2SqlCloner
             }
             transfer.IncludeExtendedProperties = Properties.Settings.Default.CopyExtendedProperties;
             transfer.IncludePermissions = Properties.Settings.Default.CopyPermissions;
+            transfer.IgnoreFileGroup = Properties.Settings.Default.IgnoreFileGroup;
             double max = CopyList.Count;
             var CopyConstraints = Properties.Settings.Default.CopyConstraints;
             if (CopyConstraints)
@@ -150,9 +181,12 @@ namespace Sql2SqlCloner
             var currList = CopyList;
             var finishedPass1 = false;
             var finishedPass2 = false;
+            var lstDelete = new List<string>();
+            int previousListCount = 0;
 
             //system-versioned history tables will be created automatically, remove them
-            foreach (Table systemhistorytable in currList.Select(o => o.Object).OfType<Table>().Where(t => t.IsSystemVersioned).ToList())
+            foreach (Table systemhistorytable in currList.Select(o => o.Object).OfType<Table>().Where(table =>
+                transfer.GetTableProperty(table, "IsSystemVersioned")).ToList())
             {
                 currList.Remove(currList.First(t => (t.Object is Table table) && table.ID == systemhistorytable.HistoryTableID));
             }
@@ -174,7 +208,9 @@ namespace Sql2SqlCloner
                     {
                         currList = currList.Where(item => !string.IsNullOrEmpty(item.Error) &&
                                                     item.Status != Properties.Resources.warning).ToList();
-                        currList.ForEach(item => { item.Status = null; item.Error = string.Empty; });
+                        currList.Where(item => !item.Error.StartsWith("Incompatible subitems")).ToList()
+                            .ForEach(item => { item.Status = null; item.Error = string.Empty; });
+
                         errorCount = 0;
                     }
                     retries++;
@@ -185,36 +221,78 @@ namespace Sql2SqlCloner
                         {
                             return;
                         }
-
                         if (backgroundWorker1.CancellationPending)
                         {
                             break;
                         }
-
                         try
                         {
-                            transfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation);
+                            transfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
                             item.Status = Properties.Resources.success;
                             item.Status.Tag = "OK";
                         }
                         catch (Exception ex)
                         {
-                            item.Status = Properties.Resources.failure;
-                            item.Status.Tag = "ERROR";
-                            item.Error = string.Empty;
+                            try
+                            {
+                                if (ex.Message.StartsWith("Incompatible subitems"))
+                                {
+                                    HandleWarning(item, ex);
+                                }
+                                else
+                                if ((item.Type == "Table" || item.Type == "View") && previousListCount != currList.Count)
+                                {
+                                    lstDelete.Add($"IF OBJECT_ID('{item.Object}','{item.Type.Substring(0, 1).Replace("T", "U")}') is not null DROP {item.Type.ToUpperInvariant()} {item.Object}");
+                                    //if this table/view is to be deleted, set its triggers as deleted
+                                    foreach (var subitem in CopyList.Where(x => x.Parent == item))
+                                    {
+                                        var replaceStatus = false;
+                                        if (subitem.Status == null)
+                                        {
+                                            replaceStatus = true;
+                                        }
+                                        else if (subitem.Status.Tag == null)
+                                        {
+                                            replaceStatus = true;
+                                        }
+                                        else if (subitem.Status.Tag.ToString() != "ERROR")
+                                        {
+                                            replaceStatus = true;
+                                        }
+                                        if (replaceStatus)
+                                        {
+                                            subitem.Status = Properties.Resources.failure;
+                                            subitem.Status.Tag = "ERROR";
+                                            subitem.Error = "Needs to be recreated";
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                            if (string.IsNullOrEmpty(item.Error))
+                            {
+                                item.Status = Properties.Resources.failure;
+                                item.Status.Tag = "ERROR";
+                                item.Error = string.Empty;
+                            }
                             var exc = ex;
                             while (exc != null)
                             {
                                 lastError = $"{exc.Message} (affected object: {item.Name})";
-                                if (item.Error != "")
+                                if (exc.Message != item.Error)
                                 {
-                                    item.Error += ";";
+                                    if (item.Error != "")
+                                    {
+                                        item.Error += ";";
+                                    }
+                                    item.Error += exc.Message;
                                 }
-
-                                item.Error += exc.Message;
                                 exc = exc.InnerException;
                             }
-                            errorCount++;
+                            if (item.Status.Tag.ToString() != "WARNING")
+                            {
+                                errorCount++;
+                            }
                         }
                         if (retries == 1)
                         {
@@ -222,7 +300,10 @@ namespace Sql2SqlCloner
                             currrow++;
                         }
                     }
-                    finishedPass1 = (errorCount == 0 || errorCount == currList.Count);
+                    lstDelete.ForEach(t => new SqlCommand(t, transfer.destinationConnection.SqlConnectionObject).ExecuteNonQuery());
+                    lstDelete.Clear();
+                    previousListCount = currList.Count;
+                    finishedPass1 = errorCount == 0 || errorCount == currList.Count;
                 }
                 if (CopyConstraints)
                 {
@@ -232,10 +313,10 @@ namespace Sql2SqlCloner
                     {
                         return;
                     }
-
                     transfer.RefreshDestination();
                     currentlyCopying = "Processing indexes...";
-                    foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").ToList())
+                    //tables should go first
+                    foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").OrderBy(ix => ix.Type).ToList())
                     {
                         try
                         {
@@ -252,7 +333,6 @@ namespace Sql2SqlCloner
                     {
                         return;
                     }
-
                     currentlyCopying = "Processing foreign keys...";
                     var savecurrent = current;
                     foreach (var item in CopyList.Where(i => i.Type == "Table").ToList())
@@ -344,13 +424,12 @@ namespace Sql2SqlCloner
                     {
                         MessageBox.Show($"Error copying permissions: {ex.Message}");
                     }
-
                     lastError = ex.Message;
                     errorCount++;
                 }
             }
             transfer.EnableDestinationConstraints();
-            if (ConfigurationManager.AppSettings["DisableDisabledObjects"].ToLower() == "true")
+            if (string.Equals(ConfigurationManager.AppSettings["DisableDisabledObjects"], "true", StringComparison.OrdinalIgnoreCase))
             {
                 transfer.DisableDisabledObjects();
             }
@@ -360,7 +439,7 @@ namespace Sql2SqlCloner
             }
             if (Properties.Settings.Default.CopyData)
             {
-                transfer.RemoveDestinationSchemaBoundObjects();
+                transfer.RemoveSchemaBindingFromDestination();
             }
             percentage = 100;
             backgroundWorker1.ReportProgress(100);
@@ -471,12 +550,14 @@ namespace Sql2SqlCloner
                 while (exc != null)
                 {
                     lastError = $"{exc.Message} (affected object: {item.Name})";
-                    if (item.Error != "")
+                    if (exc.Message != item.Error)
                     {
-                        item.Error += ";";
+                        if (item.Error != "")
+                        {
+                            item.Error += ";";
+                        }
+                        item.Error += exc.Message;
                     }
-
-                    item.Error += exc.Message;
                     exc = exc.InnerException;
                 }
                 errorCount++;
@@ -507,7 +588,7 @@ namespace Sql2SqlCloner
             {
                 if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"] != null)
                 {
-                    if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"].ToLowerInvariant().Equals("true"))
+                    if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"].Equals("true", StringComparison.InvariantCultureIgnoreCase))
                     {
                         var server = transfer.destinationConnection.SqlConnectionObject.DataSource;
                         if (server == ".")
@@ -515,10 +596,8 @@ namespace Sql2SqlCloner
                             server = "localhost";
                         }
 
-                        if (MessageBox.Show("The database " +
-                            server + "." +
-                            transfer.destinationConnection.DatabaseName +
-                            " is about to be cleared. Continue?",
+                        if (MessageBox.Show(
+                            $"The database {server}.{transfer.destinationConnection.DatabaseName} is about to be cleared. Continue?",
                             "Database deletion",
                             MessageBoxButtons.OKCancel) == DialogResult.Cancel)
                         {
@@ -531,9 +610,21 @@ namespace Sql2SqlCloner
             }
 
             Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
-            dataGridView1.Columns[0].Width = 40;
-            dataGridView1.Columns[3].Width = 62;
-            ((DataGridViewImageColumn)dataGridView1.Columns["Status"]).DefaultCellStyle.NullValue = null;
+            RefreshDataGrid();
+        }
+
+        private void RefreshDataGrid()
+        {
+            dataGridView1.Invoke(new Action(() =>
+            {
+                dataGridView1.DataSource = null;
+                dataGridView1.DataSource = CopyList;
+                dataGridView1.Update();
+                dataGridView1.Refresh();
+                dataGridView1.Columns[0].Width = 41;
+                dataGridView1.Columns[3].Width = 62;
+                ((DataGridViewImageColumn)dataGridView1.Columns["Status"]).DefaultCellStyle.NullValue = null;
+            }));
         }
 
         private void CopySchema_FormClosing(object sender, FormClosingEventArgs e)
@@ -549,7 +640,7 @@ namespace Sql2SqlCloner
 
         private string ElapsedTime()
         {
-            return $"  elapsed time: {TimeSpan.FromMilliseconds(stopwatch1.ElapsedMilliseconds):hh\\:mm\\:ss}";
+            return $" Elapsed time: {TimeSpan.FromMilliseconds(stopwatch1.ElapsedMilliseconds):hh\\:mm\\:ss}";
         }
 
         private void Timer1_Tick(object sender, EventArgs e)
@@ -563,45 +654,48 @@ namespace Sql2SqlCloner
             var firstRow = true;
             foreach (DataGridViewRow row in dataGridView1.Rows)
             {
-                if (firstRow)
+                if (row.Visible)
                 {
-                    firstRow = false;
-                }
-                else
-                {
-                    sb.Append(Environment.NewLine);
-                }
-
-                var firstCell = true;
-                foreach (DataGridViewCell cell in row.Cells)
-                {
-                    if (firstCell)
+                    if (firstRow)
                     {
-                        firstCell = false;
+                        firstRow = false;
                     }
                     else
                     {
-                        sb.Append('\t');
+                        sb.Append(Environment.NewLine);
                     }
 
-                    if (cell is DataGridViewImageCell)
+                    var firstCell = true;
+                    foreach (DataGridViewCell cell in row.Cells)
                     {
-                        if (cell.Value == null)
+                        if (firstCell)
                         {
-                            sb.Append("N/A");
+                            firstCell = false;
                         }
                         else
                         {
-                            sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                            sb.Append('\t');
+                        }
+
+                        if (cell is DataGridViewImageCell)
+                        {
+                            if (cell.Value == null)
+                            {
+                                sb.Append("N/A");
+                            }
+                            else
+                            {
+                                sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                            }
+                        }
+                        else
+                        {
+                            sb.Append(cell.EditedFormattedValue?.ToString().Replace(Environment.NewLine, " ").Replace("\t", ""));
                         }
                     }
-                    else
-                    {
-                        sb.Append(cell.EditedFormattedValue?.ToString().Replace(Environment.NewLine, " ").Replace("\t", ""));
-                    }
                 }
+                Clipboard.SetText(sb.ToString());
             }
-            Clipboard.SetText(sb.ToString());
         }
 
         private void btnPause_Click(object sender, EventArgs e)

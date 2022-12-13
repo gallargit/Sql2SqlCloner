@@ -2,41 +2,75 @@
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Sql2SqlCloner
 {
     public partial class CopyTabledata : Form
     {
-        private readonly SqlDataTransfer datatransfer;
-        private readonly SqlSchemaTransfer schematransfer;
+        private readonly SqlDataTransfer DataTransfer;
+        private readonly SqlSchemaTransfer SchemaTransfer;
+        private readonly bool SelectOnlyTables;
         private int currrow;
         private int errorCount;
         private int percentage;
         private string currentlyCopying = "";
         private string lastError = "";
+        private readonly DateTime? initialTime;
         private readonly object inProgress = new object();
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
+        private readonly object objLock = new object();
 
-        public CopyTabledata(List<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer, bool startImmediately, bool convertCollation)
+        public CopyTabledata(List<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer, bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
         {
-            var tempRows = new List<DataGridViewRow>();
+            this.initialTime = initialTime;
+            var CopyRows = new ConcurrentBag<DataGridViewRow>();
             //show form while initializating
             InitializeComponent();
             Visible = true;
             Cursor = Cursors.WaitCursor;
             dataGridView1.Rows.Add(Properties.Resources.waiting, "Calculating...", "", null, "");
+            stopwatch1.Start();
+            Timer1.Start();
+
             Application.DoEvents();
 
-            datatransfer = initialdatatransfer;
-            schematransfer = initialschematransfer;
+            DataTransfer = initialdatatransfer;
+            SchemaTransfer = initialschematransfer;
+            SelectOnlyTables = selectOnlyTables;
+
+            var tabDictionarySource = new Dictionary<string, Table>();
+            SchemaTransfer.SourceObjects.OfType<SqlSchemaTable>().Select(o => o.Object as Table).ToList()
+                .ForEach(t => tabDictionarySource[t.ToString()] = t);
+            if (SchemaTransfer.DestinationObjects.Count == 0)
+            {
+                SchemaTransfer.RefreshDestinationObjects();
+            }
+            var tabDictionaryDestination = new Dictionary<string, Table>();
+            SchemaTransfer.DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object as Table).ToList()
+                .ForEach(t => tabDictionaryDestination[t.ToString()] = t);
+
+            Task tskDeleteRecords = null;
+            if (SelectOnlyTables)
+            {
+                if (Properties.Settings.Default.DeleteDestinationTables)
+                {
+                    tskDeleteRecords = Task.Run(() =>
+                    {
+                        DataTransfer.DisableAllDestinationConstraints();
+                        DataTransfer.DeleteDestinationDatabase();
+                    });
+                }
+            }
 
             if (!long.TryParse(ConfigurationManager.AppSettings["GlobalTOP"], out long GLOBALTOP))
             {
@@ -48,67 +82,92 @@ namespace Sql2SqlCloner
                 GLOBALTOP = 0;
             }
 
-            foreach (var item in list)
+            //Doing this process with two threads improves performance
+            //adding more threads does not improve results
+            var NUMTHREADS = 2;
+            var tasks = new List<Task>();
+            for (int i = 0; i < NUMTHREADS; i++)
             {
-                long TOP = item.TopRecords;
-                var sTOP = "";
-                if (TOP <= 0)
+                var CURRENTTHREAD = i;
+                tasks.Add(Task.Run(() =>
                 {
-                    TOP = GLOBALTOP;
-                }
+                    var lastRefresh = DateTime.Now;
+                    var sublist = list.Skip(CURRENTTHREAD * (list.Count / NUMTHREADS))
+                        //last thread takes "the rest" of the items
+                        .Take(CURRENTTHREAD == (NUMTHREADS - 1) ? list.Count : list.Count / NUMTHREADS);
 
-                if (GLOBALTOP > 0 && TOP > 0 && TOP > GLOBALTOP)
-                {
-                    TOP = GLOBALTOP;
-                }
-
-                if (TOP > 0)
-                {
-                    sTOP = $" TOP {TOP}";
-                }
-
-                var fields = " *";
-                if (convertCollation)
-                {
-                    if (schematransfer == null)
+                    foreach (var item in sublist)
                     {
-                        schematransfer = new SqlSchemaTransfer(
-                           initialdatatransfer.sourceConnection.ConnectionString,
-                           initialdatatransfer.destinationConnection.ConnectionString,
-                           new CancellationToken());
-                    }
-                    fields = "";
-                    var tab = (Table)schematransfer.SourceObjects.OfType<SqlSchemaTable>().First(f => f.Object.ToString() == item.Table).Object;
-                    {
-                        var selectList = new StringBuilder();
-                        var destinationTable = (Table)schematransfer.DestinationObjects.OfType<SqlSchemaTable>().First(f => f.Object.ToString() == item.Table).Object;
-
-                        foreach (Column col in tab.Columns)
+                        long TOP = item.TopRecords;
+                        var sTOP = "";
+                        if (TOP <= 0)
                         {
-                            selectList.Append(selectList.Length == 0 ? " " : ",");
-                            if (!string.IsNullOrEmpty(col.Collation))
+                            TOP = GLOBALTOP;
+                        }
+
+                        if (GLOBALTOP > 0 && TOP > 0 && TOP > GLOBALTOP)
+                        {
+                            TOP = GLOBALTOP;
+                        }
+
+                        if (TOP > 0)
+                        {
+                            sTOP = $" TOP {TOP}";
+                        }
+
+                        var fields = " *";
+                        if (convertCollation)
+                        {
+                            fields = "";
+                            var sourceTable = tabDictionarySource[item.Table];
+                            var selectList = new StringBuilder();
+                            var destinationTable = tabDictionaryDestination[item.Table];
+                            foreach (Column col in sourceTable.Columns)
                             {
-                                selectList.Append(col.ToString()).Append(" COLLATE ").Append(
-                                    destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col.ToString());
+                                if (!col.Computed)
+                                {
+                                    selectList.Append(selectList.Length == 0 ? " " : ",");
+                                    if (!string.IsNullOrEmpty(col.Collation))
+                                    {
+                                        lock (objLock)
+                                        {
+                                            selectList.Append(col.ToString()).Append(" COLLATE ").Append(
+                                                destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col.ToString());
+                                        }
+                                    }
+                                    else
+                                    {
+                                        selectList.Append(col.ToString());
+                                    }
+                                }
                             }
-                            else
+                            fields = selectList.ToString();
+                        }
+
+                        var sql = $"SELECT{sTOP}{fields} FROM {item.Table} WITH(NOLOCK) {item.WhereFilter}";
+                        var row = (DataGridViewRow)dataGridView1.Rows[0].Clone();
+                        row.SetValues(Properties.Resources.empty, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant());
+                        CopyRows.Add(row);
+                        if (CURRENTTHREAD == 0)
+                        {
+                            //Prevent "ContextSwitchDeadlock Was Detected" exceptions
+                            if ((DateTime.Now - lastRefresh).TotalSeconds > 9)
                             {
-                                selectList.Append(col.ToString());
+                                Application.DoEvents();
+                                lastRefresh = DateTime.Now;
                             }
                         }
-                        fields = selectList.ToString();
                     }
                 }
-
-                var sql = $"SELECT{sTOP}{fields} FROM {item.Table} WITH(NOLOCK) {item.WhereFilter}";
-                var row = (DataGridViewRow)dataGridView1.Rows[0].Clone();
-                row.SetValues(null, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant());
-                tempRows.Add(row);
+                ));
             }
 
-            dataGridView1.Rows.Clear();
-            dataGridView1.Rows.AddRange(tempRows.ToArray());
+            tasks.ForEach(tt => tt.Wait());
 
+            tskDeleteRecords?.Wait();
+
+            dataGridView1.Rows.Clear();
+            dataGridView1.Rows.AddRange(CopyRows.OrderBy(a => a.Cells[1].Value.ToString()).ToArray());
             btnCancel.Enabled = btnCopyMessages.Enabled = btnNext.Enabled = btnPause.Enabled = true;
             Cursor = Cursors.Default;
             label1.Text = "Click on the 'Copy' button to start copying the below listed SQL tables' data";
@@ -122,18 +181,24 @@ namespace Sql2SqlCloner
 
         private void btnNext_Click(object sender, EventArgs e)
         {
-            stopwatch1.Start();
-            Timer1.Start();
-            btnNext.Enabled = false;
-            Cursor = Cursors.WaitCursor;
-            backgroundWorker1.DoWork += backgroundWorker1_DoWork;
-            backgroundWorker1.RunWorkerCompleted += backgroundWorker1_RunWorkerCompleted;
-            backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
-            backgroundWorker1.WorkerSupportsCancellation = true;
-            backgroundWorker1.WorkerReportsProgress = true;
-            label1.Text = "Copying data in progress...";
-            progressBar1.Value = 0;
-            backgroundWorker1.RunWorkerAsync();
+            if (btnNext.Text == "Start over")
+            {
+                DialogResult = DialogResult.Retry;
+                Close();
+            }
+            else
+            {
+                btnNext.Enabled = false;
+                Cursor = Cursors.WaitCursor;
+                backgroundWorker1.DoWork += backgroundWorker1_DoWork;
+                backgroundWorker1.RunWorkerCompleted += backgroundWorker1_RunWorkerCompleted;
+                backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
+                backgroundWorker1.WorkerSupportsCancellation = true;
+                backgroundWorker1.WorkerReportsProgress = true;
+                label1.Text = "Copying data in progress...";
+                progressBar1.Value = 0;
+                backgroundWorker1.RunWorkerAsync();
+            }
         }
 
         private void backgroundWorker1_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
@@ -141,7 +206,8 @@ namespace Sql2SqlCloner
             double current = 0;
             double max = dataGridView1.Rows.Count;
 
-            datatransfer.DisableAllDestinationConstraints();
+            DataTransfer.DisableAllDestinationConstraints();
+
             foreach (DataGridViewRow item in dataGridView1.Rows)
             {
                 pause.WaitOne(Timeout.Infinite);
@@ -160,11 +226,11 @@ namespace Sql2SqlCloner
                 {
                     var tableName = item.Cells["Table"].Value.ToString();
                     currentlyCopying = $"Copying {tableName.Replace("[", "").Replace("]", "")}...";
-                    datatransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
+                    DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
                     //enable table constraints for standalone tables to avoid a single fat transaction at the end
                     if (string.Equals(item.Cells["HasRelationships"].Value.ToString(), "false", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        datatransfer.EnableTableConstraints(tableName);
+                        DataTransfer.EnableTableConstraints(tableName);
                     }
                     item.Cells["Status"].Value = Properties.Resources.success;
                     ((System.Drawing.Bitmap)item.Cells["Status"].Value).Tag = "OK";
@@ -185,7 +251,7 @@ namespace Sql2SqlCloner
             }
             try
             {
-                schematransfer?.RecreateDestinationSchemaBoundObjects();
+                SchemaTransfer?.ReAddSchemaBindingToDestination();
             }
             catch (Exception ex)
             {
@@ -244,23 +310,36 @@ namespace Sql2SqlCloner
                     var savelabeltext = label1.Text;
                     autoScrollGrid.Visible = false;
                     label1.Text = "Enabling constraints, please wait";
+                    Application.DoEvents();
                     btnCancel.Enabled = false;
+                    DateTime endTime;
+                    var msgResult = "";
                     try
                     {
-                        datatransfer.EnableAllDestinationConstraints();
-                        if (ConfigurationManager.AppSettings["DisableDisabledObjects"].ToLower() == "true")
+                        DataTransfer.EnableAllDestinationConstraints();
+                        if (string.Equals(ConfigurationManager.AppSettings["DisableDisabledObjects"], "true", StringComparison.OrdinalIgnoreCase))
                         {
-                            datatransfer.DisableDisabledObjects();
+                            DataTransfer.DisableDisabledObjects();
                         }
-                        MessageBox.Show("Success");
+                        endTime = DateTime.Now;
+                        msgResult = "Success";
                         label1.Text = savelabeltext;
                     }
                     catch (Exception ex)
                     {
                         label1.Text = $"Completed with errors, constraints not enabled: {ex.Message}";
                         btnCopyMessages.Visible = true;
-                        MessageBox.Show(ex.Message);
+                        endTime = DateTime.Now;
+                        msgResult = ex.Message;
                     }
+                    if (initialTime.HasValue)
+                    {
+                        var timeDiff = endTime - initialTime.Value;
+                        label2.Text += $", Total running time {(timeDiff.Days == 0 ? "" : timeDiff.Days + " days ") + timeDiff.ToString("hh\\:mm\\:ss")}";
+                    }
+                    MessageBox.Show(msgResult);
+                    btnNext.Text = "Start over";
+                    btnNext.Enabled = true;
                     btnCancel.Enabled = true;
                 }
                 else
@@ -303,7 +382,7 @@ namespace Sql2SqlCloner
                 days++;
                 millis -= 86400000;
             }
-            return $"  elapsed time: {(days > 0 ? $"{days}:" : "")}{TimeSpan.FromMilliseconds(stopwatch1.ElapsedMilliseconds):hh\\:mm\\:ss}";
+            return $" Elapsed time: {(days > 0 ? $"{days}:" : "")}{TimeSpan.FromMilliseconds(stopwatch1.ElapsedMilliseconds):hh\\:mm\\:ss}";
         }
 
         private void Timer1_Tick(object sender, EventArgs e)
@@ -317,49 +396,52 @@ namespace Sql2SqlCloner
             var firstRow = true;
             foreach (DataGridViewRow row in dataGridView1.Rows)
             {
-                if (firstRow)
+                if (row.Visible)
                 {
-                    firstRow = false;
-                }
-                else
-                {
-                    sb.Append(Environment.NewLine);
-                }
-
-                int counter = 0;
-                var firstCell = true;
-                foreach (DataGridViewCell cell in row.Cells)
-                {
-                    if (counter < 4)
+                    if (firstRow)
                     {
-                        if (firstCell)
-                        {
-                            firstCell = false;
-                        }
-                        else
-                        {
-                            sb.Append('\t');
-                        }
+                        firstRow = false;
+                    }
+                    else
+                    {
+                        sb.Append(Environment.NewLine);
+                    }
 
-                        if (cell is DataGridViewImageCell)
+                    int counter = 0;
+                    var firstCell = true;
+                    foreach (DataGridViewCell cell in row.Cells)
+                    {
+                        if (counter < 4)
                         {
-                            if (cell.Value == null)
+                            if (firstCell)
                             {
-                                sb.Append("N/A");
+                                firstCell = false;
                             }
                             else
                             {
-                                sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                                sb.Append('\t');
+                            }
+
+                            if (cell is DataGridViewImageCell)
+                            {
+                                if (cell.Value == null)
+                                {
+                                    sb.Append("N/A");
+                                }
+                                else
+                                {
+                                    sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                                }
+                            }
+                            else
+                            {
+                                sb.Append(cell.EditedFormattedValue?.ToString().Replace(Environment.NewLine, " ").Replace("\t", ""));
                             }
                         }
-                        else
-                        {
-                            sb.Append(cell.EditedFormattedValue?.ToString().Replace(Environment.NewLine, " ").Replace("\t", ""));
-                        }
+                        counter++;
                     }
-                    counter++;
+                    Clipboard.SetText(sb.ToString());
                 }
-                Clipboard.SetText(sb.ToString());
             }
         }
 

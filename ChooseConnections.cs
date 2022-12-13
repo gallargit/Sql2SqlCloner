@@ -16,6 +16,7 @@ namespace Sql2SqlCloner
     public partial class ChooseConnections : Form
     {
         private string strtskSource, strtskDestination, sourceConnection, destinationConnection;
+        private bool EnablePreload = ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() == "true";
         private Task<SqlSchemaTransfer> tskPreload;
         private readonly CancellationTokenSource tokenSource = new CancellationTokenSource();
         private CancellationToken token;
@@ -25,7 +26,7 @@ namespace Sql2SqlCloner
             InitializeComponent();
         }
 
-        private string GetCensoredConnection(string conn)
+        private string GetConnection(string conn)
         {
             if (string.IsNullOrWhiteSpace(conn) ||
                 !string.Equals(ConfigurationManager.AppSettings["CensorPasswords"], "true", StringComparison.InvariantCultureIgnoreCase))
@@ -40,9 +41,9 @@ namespace Sql2SqlCloner
                 {
                     sb.Append(";");
                 }
-                if (s.ToLowerInvariant().StartsWith("password="))
+                if (s.StartsWith("password=", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    sb.Append(s.Substring(0, 9));
+                    sb.Append(s, 0, 9);
                     sb.Append("***");
                 }
                 else
@@ -51,34 +52,6 @@ namespace Sql2SqlCloner
                 }
             }
             return sb.ToString();
-        }
-
-        private void ChooseConnections_Load(object sender, EventArgs e)
-        {
-            Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
-            sourceConnection = Properties.Settings.Default.SourceServer;
-            txtSource.Text = GetCensoredConnection(sourceConnection);
-            destinationConnection = Properties.Settings.Default.DestinationServer;
-            txtDestination.Text = GetCensoredConnection(destinationConnection);
-            isSchema.Checked = Properties.Settings.Default.CopySchema;
-            isData.Checked = Properties.Settings.Default.CopyData;
-            if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
-            {
-                btnNext_Click(sender, e);
-            }
-            else
-            {
-                //start preloading the saved databases' info
-                if (ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() == "true")
-                {
-                    if (!string.IsNullOrEmpty(sourceConnection) && !string.IsNullOrEmpty(destinationConnection))
-                    {
-                        strtskSource = sourceConnection;
-                        strtskDestination = destinationConnection;
-                        tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token), token);
-                    }
-                }
-            }
         }
 
         private string GetConnectionString(string connectionString)
@@ -112,13 +85,48 @@ namespace Sql2SqlCloner
             return conn;
         }
 
+        private void SetFormControls(bool active)
+        {
+            foreach (Control c in Controls)
+            {
+                c.Enabled = active;
+            }
+            lblPleaseWait.Visible = lblPleaseWait.Enabled = !active;
+        }
+
+        private void ChooseConnections_Load(object sender, EventArgs e)
+        {
+            Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
+            sourceConnection = Properties.Settings.Default.SourceServer;
+            txtSource.Text = GetConnection(sourceConnection);
+            destinationConnection = Properties.Settings.Default.DestinationServer;
+            txtDestination.Text = GetConnection(destinationConnection);
+            isSchema.Checked = Properties.Settings.Default.CopySchema;
+            isData.Checked = Properties.Settings.Default.CopyData;
+
+            if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
+            {
+                btnNext_Click(sender, e);
+            }
+            else
+            {
+                //start preloading the saved databases' info
+                if (EnablePreload && !string.IsNullOrEmpty(sourceConnection) && !string.IsNullOrEmpty(destinationConnection))
+                {
+                    EnablePreload = false;
+                    strtskSource = strtskDestination = destinationConnection;
+                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token), token);
+                }
+            }
+        }
+
         private void btnDestination_Click(object sender, EventArgs e)
         {
             var newcx = GetConnectionString(destinationConnection);
             if (!string.IsNullOrEmpty(newcx))
             {
                 destinationConnection = newcx;
-                txtDestination.Text = GetCensoredConnection(destinationConnection);
+                txtDestination.Text = GetConnection(destinationConnection);
             }
         }
 
@@ -128,7 +136,7 @@ namespace Sql2SqlCloner
             if (!string.IsNullOrEmpty(newcx))
             {
                 sourceConnection = newcx;
-                txtSource.Text = GetCensoredConnection(sourceConnection);
+                txtSource.Text = GetConnection(sourceConnection);
             }
         }
 
@@ -141,6 +149,8 @@ namespace Sql2SqlCloner
 
         private void btnNext_Click(object sender, EventArgs e)
         {
+            var autoRun = ModifierKeys.HasFlag(Keys.Shift);
+            var initialTime = DateTime.Now;
             if (!isData.Checked && !isSchema.Checked)
             {
                 MessageBox.Show("Please tick what to copy (schema/data)");
@@ -170,11 +180,7 @@ namespace Sql2SqlCloner
             List<SqlSchemaObject> tablesToCopy = null;
             try
             {
-                foreach (Control c in Controls)
-                {
-                    c.Enabled = false;
-                }
-                lblPleaseWait.Visible = lblPleaseWait.Enabled = true;
+                SetFormControls(false);
                 Application.DoEvents();
                 if (tskPreload != null && strtskSource == sourceConnection && strtskDestination == destinationConnection)
                 {
@@ -187,6 +193,7 @@ namespace Sql2SqlCloner
                     token = new CancellationToken();
                     schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token);
                 }
+                strtskSource = strtskDestination = null;
                 tskPreload = null;
 
                 if (schematransfer.SameDatabase &&
@@ -226,7 +233,7 @@ namespace Sql2SqlCloner
             if (schematransfer.SourceObjects?.Count > 0)
             {
                 firststepok = false;
-                var chooseSchema = new ChooseSchemas(schematransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked);
+                var chooseSchema = new ChooseSchemas(schematransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked, autoRun);
                 var resultdiag = chooseSchema.ShowDialog();
                 if (resultdiag == DialogResult.Abort || resultdiag == DialogResult.Cancel)
                 {
@@ -249,10 +256,13 @@ namespace Sql2SqlCloner
             }
             else
             {
-                MessageBox.Show("No SQL objects found in source database to copy");
-                Environment.Exit(0);
-                return;
+                {
+                    MessageBox.Show("No SQL objects found in source database to copy");
+                    Environment.Exit(0);
+                    return;
+                }
             }
+
             if (isData.Checked)
             {
                 SqlDataTransfer datatransfer;
@@ -294,13 +304,25 @@ namespace Sql2SqlCloner
 
                 if (itemsToCopy.Count > 0)
                 {
-                    var copyTableData = new CopyTabledata(itemsToCopy, datatransfer, schematransfer, firststepok,
-                        Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation)
+                    var copyTableData = new CopyTabledata(itemsToCopy, datatransfer, schematransfer, firststepok || autoRun,
+                        Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation,
+                        isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null)
                     {
                         Visible = false
                     };
                     copyTableData.ShowDialog();
-                    Environment.Exit(0);
+                    if (copyTableData.DialogResult == DialogResult.Retry)
+                    {
+                        AbortBackgroundTask();
+                        strtskSource = strtskDestination = null;
+                        SetFormControls(true);
+                        ChooseConnections_Load(null, null);
+                        Visible = true;
+                    }
+                    else
+                    {
+                        Environment.Exit(0);
+                    }
                     return;
                 }
                 else
@@ -322,7 +344,7 @@ namespace Sql2SqlCloner
 
         private void txtSource_TextChanged(object sender, EventArgs e)
         {
-            if (txtSource.Text != GetCensoredConnection(sourceConnection))
+            if (txtSource.Text != GetConnection(sourceConnection))
             {
                 sourceConnection = txtSource.Text;
             }
@@ -330,7 +352,7 @@ namespace Sql2SqlCloner
 
         private void txtDestination_TextChanged(object sender, EventArgs e)
         {
-            if (txtDestination.Text != GetCensoredConnection(destinationConnection))
+            if (txtDestination.Text != GetConnection(destinationConnection))
             {
                 destinationConnection = txtDestination.Text;
             }

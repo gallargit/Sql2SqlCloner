@@ -13,7 +13,7 @@ namespace Sql2SqlCloner.Properties
 
 
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.1.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.4.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase
     {
 
@@ -234,6 +234,36 @@ namespace Sql2SqlCloner.Properties
             set
             {
                 this["DisableNotForReplication"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DeleteDestinationTables
+        {
+            get
+            {
+                return ((bool)(this["DeleteDestinationTables"]));
+            }
+            set
+            {
+                this["DeleteDestinationTables"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IgnoreFileGroup
+        {
+            get
+            {
+                return ((bool)(this["IgnoreFileGroup"]));
+            }
+            set
+            {
+                this["IgnoreFileGroup"] = value;
             }
         }
     }

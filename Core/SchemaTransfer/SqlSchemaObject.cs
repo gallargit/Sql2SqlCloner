@@ -11,10 +11,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         public bool CopyData { get; set; }
         public NamedSmoObject Object { get; set; }
         public string Error { get; set; }
+        [System.ComponentModel.Browsable(false)]
+        public SqlSchemaObject Parent { get; set; }
 
         public SqlSchemaObject()
         {
             CopyData = false;
+            Parent = null;
         }
     }
 }

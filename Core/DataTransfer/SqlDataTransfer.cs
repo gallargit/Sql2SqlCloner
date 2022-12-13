@@ -11,22 +11,12 @@ namespace Sql2SqlCloner.Core.DataTransfer
 {
     public class SqlDataTransfer : SqlTransfer
     {
-        private readonly SqlBulkCopy bulkCopy;
+        private SqlBulkCopy BulkCopy;
+        private readonly string DestinationConnectionString;
 
         public SqlDataTransfer(string src, string dest)
         {
-            if (!int.TryParse(ConfigurationManager.AppSettings["BatchSize"], out int batchSize))
-            {
-                batchSize = 5000;
-            }
-
-            bulkCopy = new SqlBulkCopy(dest, SqlBulkCopyOptions.KeepIdentity)
-            {
-                BatchSize = batchSize,
-                NotifyAfter = batchSize * 2,
-                BulkCopyTimeout = SqlTimeout
-            };
-
+            DestinationConnectionString = dest;
             sourceConnection = new ServerConnection(new SqlConnection(src));
             destinationConnection = new ServerConnection(new SqlConnection(dest));
             destinationConnection.SqlConnectionObject.Open();
@@ -72,7 +62,6 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     EnableDestinationConstraints();
                     finished = true;
                     RunInDestination(SQLEnableConstraints);
-
                 }
                 catch (Exception ex)
                 {
@@ -193,7 +182,8 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     inner join sys.schemas sche on sche.schema_id=tab.schema_id)
                     left join sys.computed_columns ccl on ccl.object_id=col.object_id and ccl.column_id=col.column_id
                     where sche.name=@schema and tab.name=@table
-                    and COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed')=0 --exclude computed columns
+                    and ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0)=0 --exclude computed columns
+                    and ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'GeneratedAlwaysType'),0)=0 --exclude generated columns
                     order by 1,2,col.column_id";
                 command.CommandTimeout = SqlTimeout;
                 command.CommandType = CommandType.Text;
@@ -251,6 +241,19 @@ namespace Sql2SqlCloner.Core.DataTransfer
             SqlDataReader reader = null;
             try
             {
+                if (BulkCopy == null)
+                {
+                    if (!int.TryParse(ConfigurationManager.AppSettings["BatchSize"], out int batchSize))
+                    {
+                        batchSize = 5000;
+                    }
+                    BulkCopy = new SqlBulkCopy(DestinationConnectionString, SqlBulkCopyOptions.KeepIdentity)
+                    {
+                        BatchSize = batchSize,
+                        NotifyAfter = batchSize * 2,
+                        BulkCopyTimeout = SqlTimeout
+                    };
+                }
                 var masterhistorytable = GetMasterHistoryTable(destinationConnection.SqlConnectionObject, table);
                 if (!string.IsNullOrEmpty(masterhistorytable))
                 {
@@ -260,16 +263,16 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     }.ExecuteNonQuery();
                 }
 
-                bulkCopy.DestinationTableName = table;
-                bulkCopy.ColumnMappings.Clear();
+                BulkCopy.DestinationTableName = table;
+                BulkCopy.ColumnMappings.Clear();
                 GetMapping(sourceConnection.SqlConnectionObject, destinationConnection.SqlConnectionObject, table).ToList().
-                ForEach(columnName => bulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(columnName, columnName)));
+                    ForEach(columnName => BulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(columnName, columnName)));
 
                 using (SqlCommand myCommand = new SqlCommand(query, sourceConnection.SqlConnectionObject))
                 {
                     myCommand.CommandTimeout = SqlTimeout;
                     reader = myCommand.ExecuteReader();
-                    bulkCopy.WriteToServer(reader);
+                    BulkCopy.WriteToServer(reader);
                     reader.Close();
                 }
 
@@ -281,6 +284,11 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     }.ExecuteNonQuery();
                 }
                 return true;
+            }
+            catch
+            {
+                BulkCopy = null;
+                throw;
             }
             finally
             {

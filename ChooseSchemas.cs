@@ -17,6 +17,7 @@ namespace Sql2SqlCloner
         private readonly bool CloseIfSuccess;
         private readonly bool SelectOnlyTables;
         private readonly bool CopyOnlySchema;
+        private readonly bool AutoRun = false;
         private bool NextClicked;
         private bool SortByRecords;
         private readonly ContextMenu NodeContextMenu = new ContextMenu();
@@ -25,8 +26,14 @@ namespace Sql2SqlCloner
         private static Dictionary<string, string> WHERECONDITIONS;
         private static Dictionary<string, long> TOPROWS;
 
-        public ChooseSchemas(SqlSchemaTransfer transferSchema, bool closeIfSuccess, bool selectOnlyTables, bool copyOnlySchema)
+        public ChooseSchemas(SqlSchemaTransfer transferSchema, bool closeIfSuccess, bool selectOnlyTables, bool copyOnlySchema, bool autoRun)
         {
+            if (transferSchema == null)
+            {
+                MessageBox.Show("Schema to transfer is null");
+                Environment.Exit(0);
+                return;
+            }
             InitializeComponent();
             if (transferSchema.SourceObjects?.Any() != true)
             {
@@ -42,7 +49,8 @@ namespace Sql2SqlCloner
             transfer = transferSchema;
             items = transferSchema.SourceObjects.ToList();
             btnSortNodesBy.Visible = !copyOnlySchema;
-            flowLayoutPanel1.Visible = !selectOnlyTables;
+            optionsBoxSchema.Visible = !selectOnlyTables;
+            optionsBoxData.Visible = selectOnlyTables;
 
             var menuTop = new MenuItem
             {
@@ -63,6 +71,11 @@ namespace Sql2SqlCloner
             }
 
             LoadTreeNodes(SortByRecords);
+
+            if (autoRun || string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
+            {
+                AutoRun = true;
+            }
         }
 
         private string FormatCopyData(long ROWCOUNT, long TOP, string WHERE)
@@ -420,6 +433,7 @@ namespace Sql2SqlCloner
             {
                 DialogResult = DialogResult.OK;
                 Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
+                Properties.Settings.Default.DeleteDestinationTables = deleteDestinationTables.Checked;
                 Properties.Settings.Default.Save();
             }
             else
@@ -437,7 +451,8 @@ namespace Sql2SqlCloner
                 Properties.Settings.Default.StopIfErrors = stopIfErrors.Checked;
                 Properties.Settings.Default.ClearDestinationDatabase = clearDestinationDatabase.Checked;
                 Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
-                Properties.Settings.Default.DisableNotForReplication = disableNotForReplication.Checked; ;
+                Properties.Settings.Default.DisableNotForReplication = disableNotForReplication.Checked;
+                Properties.Settings.Default.IgnoreFileGroup = ignoreFileGroup.Checked;
                 Properties.Settings.Default.Save();
 
                 DialogResult = new CopySchema(transfer, SelectedObjects.ToList(), CloseIfSuccess,
@@ -483,9 +498,12 @@ namespace Sql2SqlCloner
 
         private void btnSortNodesBy_Click(object sender, EventArgs e)
         {
+            Cursor = Cursors.WaitCursor;
+            Application.DoEvents();
             SortByRecords = !SortByRecords;
             btnSortNodesBy.Text = $"Sort by {(SortByRecords ? "name" : "records")}";
             LoadTreeNodes(SortByRecords);
+            Cursor = Cursors.Default;
         }
 
         private void ChooseSchemas_Load(object sender, EventArgs e)
@@ -496,14 +514,16 @@ namespace Sql2SqlCloner
             copyFullText.Checked = Properties.Settings.Default.CopyFullText;
             dropAndRecreateObjects.Checked = Properties.Settings.Default.DropAndRecreateObjects;
             copySecurity.Checked = Properties.Settings.Default.CopySecurity;
+            deleteDestinationTables.Checked = Properties.Settings.Default.DeleteDestinationTables;
             copyExtendedProperties.Checked = Properties.Settings.Default.CopyExtendedProperties;
             copyPermissions.Checked = Properties.Settings.Default.CopyPermissions;
             stopIfErrors.Checked = Properties.Settings.Default.StopIfErrors;
             clearDestinationDatabase.Checked = Properties.Settings.Default.ClearDestinationDatabase;
             copyCollation.SelectedIndex = (int)Properties.Settings.Default.CopyCollation;
             disableNotForReplication.Checked = Properties.Settings.Default.DisableNotForReplication;
+            ignoreFileGroup.Checked = Properties.Settings.Default.IgnoreFileGroup;
 
-            if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
+            if (AutoRun)
             {
                 btnNext_Click(sender, e);
             }
