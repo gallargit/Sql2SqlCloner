@@ -23,8 +23,8 @@ namespace Sql2SqlCloner
         private readonly ContextMenu NodeContextMenu = new ContextMenu();
         private SqlSchemaTable CurrentTable;
         private TreeNode CurrentNode;
-        private static Dictionary<string, string> WHERECONDITIONS;
-        private static Dictionary<string, long> TOPROWS;
+        private Dictionary<string, string> WHERECONDITIONS;
+        private Dictionary<string, long> TOPROWS;
 
         public ChooseSchemas(SqlSchemaTransfer transferSchema, bool closeIfSuccess, bool selectOnlyTables, bool copyOnlySchema, bool autoRun)
         {
@@ -99,7 +99,7 @@ namespace Sql2SqlCloner
             return extradata;
         }
 
-        private static void CalculateFilters()
+        private void CalculateFilters()
         {
             WHERECONDITIONS = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
             TOPROWS = new Dictionary<string, long>(StringComparer.InvariantCultureIgnoreCase);

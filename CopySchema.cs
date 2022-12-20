@@ -97,8 +97,10 @@ namespace Sql2SqlCloner
             item.Name += ".";
             item.Type = currObject.GetType().Name;
             item.Object = currObject;
-
-            dataGridView1.Invoke(new Action(() => dataGridView1.Refresh()));
+            if (IsHandleCreated)
+            {
+                dataGridView1.Invoke(new Action(() => dataGridView1.Refresh()));
+            }
         }
 
         private void backgroundWorker1_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
@@ -615,16 +617,19 @@ namespace Sql2SqlCloner
 
         private void RefreshDataGrid()
         {
-            dataGridView1.Invoke(new Action(() =>
+            if (IsHandleCreated)
             {
-                dataGridView1.DataSource = null;
-                dataGridView1.DataSource = CopyList;
-                dataGridView1.Update();
-                dataGridView1.Refresh();
-                dataGridView1.Columns[0].Width = 41;
-                dataGridView1.Columns[3].Width = 62;
-                ((DataGridViewImageColumn)dataGridView1.Columns["Status"]).DefaultCellStyle.NullValue = null;
-            }));
+                dataGridView1.Invoke(new Action(() =>
+                {
+                    dataGridView1.DataSource = null;
+                    dataGridView1.DataSource = CopyList;
+                    dataGridView1.Update();
+                    dataGridView1.Refresh();
+                    dataGridView1.Columns[0].Width = 41;
+                    dataGridView1.Columns[3].Width = 62;
+                    ((DataGridViewImageColumn)dataGridView1.Columns["Status"]).DefaultCellStyle.NullValue = null;
+                }));
+            }
         }
 
         private void CopySchema_FormClosing(object sender, FormClosingEventArgs e)
