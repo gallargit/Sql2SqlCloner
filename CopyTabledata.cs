@@ -381,7 +381,7 @@ namespace Sql2SqlCloner
                 {
                     btnCopyMessages.Visible = true;
                     autoScrollGrid.CheckState = CheckState.Unchecked;
-                    autoScrollGrid.Text = "Show only errors";
+                    autoScrollGrid.Text = "Show errors only";
                     autoScrollGrid.Left -= 30;
                     MessageBox.Show(label1.Text);
                 }
@@ -520,7 +520,7 @@ namespace Sql2SqlCloner
 
         private void autoScrollGrid_CheckedChanged(object sender, EventArgs e)
         {
-            if (autoScrollGrid.Text == "Show only errors")
+            if (autoScrollGrid.Text == "Show errors only")
             {
                 foreach (DataGridViewRow row in dataGridView1.Rows)
                 {

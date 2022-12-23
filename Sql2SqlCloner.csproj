@@ -185,8 +185,8 @@
     <Reference Include="Microsoft.SqlServer.SqlWmiManagement, Version=16.100.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.SqlServer.SqlManagementObjects.160.2004021.0\lib\net462\Microsoft.SqlServer.SqlWmiManagement.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.SqlServer.Types, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
-      <HintPath>packages\Microsoft.SqlServer.Types.10.50.1600.1\lib\Net20\Microsoft.SqlServer.Types.dll</HintPath>
+    <Reference Include="Microsoft.SqlServer.Types, Version=11.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.SqlServer.Types.11.0.2\lib\net20\Microsoft.SqlServer.Types.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.SqlServer.WmiEnum, Version=16.100.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL">
       <HintPath>packages\Microsoft.SqlServer.SqlManagementObjects.160.2004021.0\lib\net462\Microsoft.SqlServer.WmiEnum.dll</HintPath>
@@ -240,6 +240,7 @@
     <Compile Include="Core\SchemaTransfer\SqlSchemaTable.cs" />
     <Compile Include="Core\SqlTransfer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="SqlServerTypes\Loader.cs" />
     <EmbeddedResource Include="ChooseSchemas.resx">
       <DependentUpon>ChooseSchemas.cs</DependentUpon>
       <SubType>Designer</SubType>
@@ -324,6 +325,23 @@
     <Content Include="Resources\waiting.png" />
     <Content Include="Resources\warning.png" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <ContentWithTargetPath Include="packages\Microsoft.SqlServer.Types.11.0.2\nativeBinaries\x64\msvcr100.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>msvcr100.dll</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="packages\Microsoft.SqlServer.Types.11.0.2\nativeBinaries\x64\SqlServerSpatial110.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>SqlServerSpatial110.dll</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="packages\Microsoft.SqlServer.Types.11.0.2\nativeBinaries\x86\msvcr100.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>SqlServerTypes\x86\msvcr100.dll</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="packages\Microsoft.SqlServer.Types.11.0.2\nativeBinaries\x86\SqlServerSpatial110.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>SqlServerTypes\x86\SqlServerSpatial110.dll</TargetPath>
+    </ContentWithTargetPath>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

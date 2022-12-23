@@ -511,7 +511,7 @@ namespace Sql2SqlCloner
                 dataGridView1.Refresh();
                 if (CopyList.Any(t => string.IsNullOrEmpty(t.Error)))
                 {
-                    autoScrollGrid.Text = "Show only errors";
+                    autoScrollGrid.Text = "Show errors only";
                     autoScrollGrid.CheckState = CheckState.Unchecked;
                 }
                 if (closeIfSuccess || !Properties.Settings.Default.StopIfErrors)
@@ -732,7 +732,7 @@ namespace Sql2SqlCloner
 
         private void autoScrollGrid_CheckedChanged(object sender, EventArgs e)
         {
-            if (autoScrollGrid.Text == "Show only errors")
+            if (autoScrollGrid.Text == "Show errors only")
             {
                 if (autoScrollGrid.Checked)
                 {

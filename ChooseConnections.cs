@@ -25,6 +25,7 @@ namespace Sql2SqlCloner
         public ChooseConnections()
         {
             InitializeComponent();
+            SqlServerTypes.Utilities.LoadNativeAssemblies(AppDomain.CurrentDomain.BaseDirectory);
         }
 
         private string GetConnection(string conn)
