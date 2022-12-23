@@ -6,7 +6,7 @@ SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject
 
 * New features (some of them can be configured at the `app.config` file):  
   * Copy several schemas
-  * Copy a broader range of objects: partitions, xmlschemas, extended properties, etc.
+  * Copy a broader range of objects and data types: partitions, xmlschemas, extended properties, spatial data, etc.
   * Exclude objects/data from copy operation
   * Select which objects/schemas/data to copy
   * View the number of records that will be copied
@@ -23,7 +23,7 @@ SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject
   * Better error handling
   * Exclude computed columns
   * Several retries to avoid errors whenever copying dependent objects
-  * No DLLs, nuget packages are used instead. WARNING: Do not try to update them to the latest version as that will break the application
+  * No DLLs, nuget packages are used instead
 
 # How to use
 Run the application, select the source and destination connections and click OK. It's usually a good idea copying to an empty database.

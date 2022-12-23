@@ -1,8 +1,8 @@
-﻿using Microsoft.SqlServer.Management.Common;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.SqlServer.Management.Common;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
-using System.Data.SqlClient;
 
 namespace Sql2SqlCloner.Core
 {

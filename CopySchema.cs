@@ -1,10 +1,10 @@
-﻿using Microsoft.SqlServer.Management.Smo;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.SqlServer.Management.Smo;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;

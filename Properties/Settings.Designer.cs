@@ -10,8 +10,6 @@
 
 namespace Sql2SqlCloner.Properties
 {
-
-
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.4.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase
@@ -264,6 +262,21 @@ namespace Sql2SqlCloner.Properties
             set
             {
                 this["IgnoreFileGroup"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool AlwaysTrustServerCertificates
+        {
+            get
+            {
+                return ((bool)(this["AlwaysTrustServerCertificates"]));
+            }
+            set
+            {
+                this["AlwaysTrustServerCertificates"] = value;
             }
         }
     }

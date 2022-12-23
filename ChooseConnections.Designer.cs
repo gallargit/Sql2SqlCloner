@@ -39,12 +39,13 @@
             this.isSchema = new System.Windows.Forms.CheckBox();
             this.isData = new System.Windows.Forms.CheckBox();
             this.lblPleaseWait = new System.Windows.Forms.Label();
+            this.trustServerCertificates = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // txtSource
             // 
             this.txtSource.Location = new System.Drawing.Point(16, 75);
-            this.txtSource.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.txtSource.Margin = new System.Windows.Forms.Padding(4);
             this.txtSource.Name = "txtSource";
             this.txtSource.Size = new System.Drawing.Size(573, 22);
             this.txtSource.TabIndex = 1;
@@ -53,7 +54,7 @@
             // txtDestination
             // 
             this.txtDestination.Location = new System.Drawing.Point(16, 138);
-            this.txtDestination.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.txtDestination.Margin = new System.Windows.Forms.Padding(4);
             this.txtDestination.Name = "txtDestination";
             this.txtDestination.Size = new System.Drawing.Size(573, 22);
             this.txtDestination.TabIndex = 3;
@@ -82,7 +83,7 @@
             // btnSource
             // 
             this.btnSource.Location = new System.Drawing.Point(600, 73);
-            this.btnSource.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnSource.Margin = new System.Windows.Forms.Padding(4);
             this.btnSource.Name = "btnSource";
             this.btnSource.Size = new System.Drawing.Size(100, 28);
             this.btnSource.TabIndex = 2;
@@ -93,7 +94,7 @@
             // btnDestination
             // 
             this.btnDestination.Location = new System.Drawing.Point(599, 134);
-            this.btnDestination.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnDestination.Margin = new System.Windows.Forms.Padding(4);
             this.btnDestination.Name = "btnDestination";
             this.btnDestination.Size = new System.Drawing.Size(100, 28);
             this.btnDestination.TabIndex = 4;
@@ -104,10 +105,10 @@
             // btnCancel
             // 
             this.btnCancel.Location = new System.Drawing.Point(599, 268);
-            this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(4);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(100, 28);
-            this.btnCancel.TabIndex = 8;
+            this.btnCancel.TabIndex = 10;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
@@ -115,10 +116,10 @@
             // btnNext
             // 
             this.btnNext.Location = new System.Drawing.Point(491, 268);
-            this.btnNext.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btnNext.Margin = new System.Windows.Forms.Padding(4);
             this.btnNext.Name = "btnNext";
             this.btnNext.Size = new System.Drawing.Size(100, 28);
-            this.btnNext.TabIndex = 7;
+            this.btnNext.TabIndex = 9;
             this.btnNext.Text = "Next";
             this.btnNext.UseVisualStyleBackColor = true;
             this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
@@ -129,7 +130,7 @@
             this.isSchema.Checked = true;
             this.isSchema.CheckState = System.Windows.Forms.CheckState.Checked;
             this.isSchema.Location = new System.Drawing.Point(20, 188);
-            this.isSchema.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.isSchema.Margin = new System.Windows.Forms.Padding(4);
             this.isSchema.Name = "isSchema";
             this.isSchema.Size = new System.Drawing.Size(114, 20);
             this.isSchema.TabIndex = 5;
@@ -142,7 +143,7 @@
             this.isData.Checked = true;
             this.isData.CheckState = System.Windows.Forms.CheckState.Checked;
             this.isData.Location = new System.Drawing.Point(172, 188);
-            this.isData.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.isData.Margin = new System.Windows.Forms.Padding(4);
             this.isData.Name = "isData";
             this.isData.Size = new System.Drawing.Size(93, 20);
             this.isData.TabIndex = 6;
@@ -158,15 +159,29 @@
             this.lblPleaseWait.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.lblPleaseWait.Name = "lblPleaseWait";
             this.lblPleaseWait.Size = new System.Drawing.Size(146, 25);
-            this.lblPleaseWait.TabIndex = 11;
+            this.lblPleaseWait.TabIndex = 8;
             this.lblPleaseWait.Text = "Please Wait...";
             this.lblPleaseWait.Visible = false;
+            // 
+            // trustServerCertificates
+            // 
+            this.trustServerCertificates.AutoSize = true;
+            this.trustServerCertificates.Checked = true;
+            this.trustServerCertificates.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.trustServerCertificates.Location = new System.Drawing.Point(456, 188);
+            this.trustServerCertificates.Margin = new System.Windows.Forms.Padding(4);
+            this.trustServerCertificates.Name = "trustServerCertificates";
+            this.trustServerCertificates.Size = new System.Drawing.Size(207, 20);
+            this.trustServerCertificates.TabIndex = 7;
+            this.trustServerCertificates.Text = "Always trust server certificates";
+            this.trustServerCertificates.UseVisualStyleBackColor = true;
             // 
             // ChooseConnections
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(728, 321);
+            this.Controls.Add(this.trustServerCertificates);
             this.Controls.Add(this.lblPleaseWait);
             this.Controls.Add(this.isData);
             this.Controls.Add(this.isSchema);
@@ -178,7 +193,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.txtDestination);
             this.Controls.Add(this.txtSource);
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "ChooseConnections";
@@ -204,5 +219,6 @@
         private System.Windows.Forms.CheckBox isSchema;
         private System.Windows.Forms.CheckBox isData;
         private System.Windows.Forms.Label lblPleaseWait;
+        private System.Windows.Forms.CheckBox trustServerCertificates;
     }
 }

@@ -58,30 +58,39 @@ namespace Sql2SqlCloner
 
         private string GetConnectionString(string connectionString)
         {
+            string tempconnectionString;
+            var trustServerCertificate = "";
             try
             {
-                _ = new DbConnectionStringBuilder
+                var builder = new DbConnectionStringBuilder
                 {
                     ConnectionString = connectionString
                 };
+                //"Trust Server Certificate" is not supported by Connection Dialog
+                if (builder.ContainsKey("Trust Server Certificate"))
+                {
+                    trustServerCertificate = ";Trust Server Certificate=" + builder["Trust Server Certificate"];
+                    builder.Remove("Trust Server Certificate");
+                }
+                tempconnectionString = builder.ConnectionString;
             }
             catch
             {
-                connectionString = null; //bad connection string
+                tempconnectionString = null; //bad connection string
             }
 
             string conn = null;
             using (var dialog = new DataConnectionDialog())
             {
                 dialog.DataSources.Add(DataSource.SqlDataSource);
-                if (!string.IsNullOrEmpty(connectionString))
+                if (!string.IsNullOrEmpty(tempconnectionString))
                 {
-                    dialog.ConnectionString = connectionString;
+                    dialog.ConnectionString = tempconnectionString;
                 }
 
                 if (DataConnectionDialog.Show(dialog) == DialogResult.OK)
                 {
-                    conn = dialog.ConnectionString;
+                    conn = dialog.ConnectionString + trustServerCertificate;
                 }
             }
             return conn;
@@ -105,6 +114,7 @@ namespace Sql2SqlCloner
             txtDestination.Text = GetConnection(destinationConnection);
             isSchema.Checked = Properties.Settings.Default.CopySchema;
             isData.Checked = Properties.Settings.Default.CopyData;
+            trustServerCertificates.Checked = Properties.Settings.Default.AlwaysTrustServerCertificates;
 
             if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
             {
@@ -170,10 +180,32 @@ namespace Sql2SqlCloner
                 txtDestination.Focus();
                 return;
             }
+            if (trustServerCertificates.Checked)
+            {
+                if (sourceConnection.IndexOf("trust server certificate", StringComparison.InvariantCultureIgnoreCase) < 0)
+                {
+                    if (!sourceConnection.EndsWith(";"))
+                    {
+                        sourceConnection += ";";
+                    }
+
+                    sourceConnection += "Trust Server Certificate=True";
+                }
+                if (destinationConnection.IndexOf("trust server certificate", StringComparison.InvariantCultureIgnoreCase) < 0)
+                {
+                    if (!destinationConnection.EndsWith(";"))
+                    {
+                        destinationConnection += ";";
+                    }
+
+                    destinationConnection += "Trust Server Certificate=True";
+                }
+            }
             Properties.Settings.Default.SourceServer = sourceConnection;
             Properties.Settings.Default.DestinationServer = destinationConnection;
             Properties.Settings.Default.CopySchema = isSchema.Checked;
             Properties.Settings.Default.CopyData = isData.Checked;
+            Properties.Settings.Default.AlwaysTrustServerCertificates = trustServerCertificates.Checked;
             Properties.Settings.Default.Save();
 
             var firststepok = false;
