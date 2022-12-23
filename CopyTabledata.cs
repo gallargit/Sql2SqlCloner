@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -16,6 +17,7 @@ namespace Sql2SqlCloner
 {
     public partial class CopyTabledata : Form
     {
+        public List<SqlDataObject> CopyList { get; }
         private readonly SqlDataTransfer DataTransfer;
         private readonly SqlSchemaTransfer SchemaTransfer;
         private readonly bool SelectOnlyTables;
@@ -33,12 +35,13 @@ namespace Sql2SqlCloner
         public CopyTabledata(List<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer, bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
         {
             this.initialTime = initialTime;
+            CopyList = list;
             var CopyRows = new ConcurrentBag<DataGridViewRow>();
             //show form while initializating
             InitializeComponent();
             Visible = true;
             Cursor = Cursors.WaitCursor;
-            dataGridView1.Rows.Add(Properties.Resources.waiting, "Calculating...", "", null, "");
+            dataGridView1.Rows.Add(Properties.Resources.waiting, "Calculating", "", null, "", 0);
             stopwatch1.Start();
             Timer1.Start();
 
@@ -60,16 +63,13 @@ namespace Sql2SqlCloner
                 .ForEach(t => tabDictionaryDestination[t.ToString()] = t);
 
             Task tskDeleteRecords = null;
-            if (SelectOnlyTables)
+            if (SelectOnlyTables && Properties.Settings.Default.DeleteDestinationTables)
             {
-                if (Properties.Settings.Default.DeleteDestinationTables)
+                tskDeleteRecords = Task.Run(() =>
                 {
-                    tskDeleteRecords = Task.Run(() =>
-                    {
-                        DataTransfer.DisableAllDestinationConstraints();
-                        DataTransfer.DeleteDestinationDatabase();
-                    });
-                }
+                    DataTransfer.DisableAllDestinationConstraints();
+                    DataTransfer.DeleteDestinationDatabase();
+                });
             }
 
             if (!long.TryParse(ConfigurationManager.AppSettings["GlobalTOP"], out long GLOBALTOP))
@@ -112,7 +112,15 @@ namespace Sql2SqlCloner
 
                         if (TOP > 0)
                         {
+                            if (item.RowCount < TOP)
+                            {
+                                TOP = item.RowCount;
+                            }
                             sTOP = $" TOP {TOP}";
+                        }
+                        else
+                        {
+                            TOP = item.RowCount;
                         }
 
                         var fields = " *";
@@ -121,38 +129,52 @@ namespace Sql2SqlCloner
                             fields = "";
                             var sourceTable = tabDictionarySource[item.Table];
                             var selectList = new StringBuilder();
-                            var destinationTable = tabDictionaryDestination[item.Table];
-                            foreach (Column col in sourceTable.Columns)
+                            if (!tabDictionaryDestination.ContainsKey(item.Table))
                             {
-                                if (!col.Computed)
+                                fields = " *"; //table not found, will throw an error later
+                            }
+                            else
+                            {
+                                var destinationTable = tabDictionaryDestination[item.Table];
+                                foreach (Column col in sourceTable.Columns)
                                 {
-                                    selectList.Append(selectList.Length == 0 ? " " : ",");
-                                    if (!string.IsNullOrEmpty(col.Collation))
+                                    if (!col.Computed)
                                     {
-                                        lock (objLock)
+                                        selectList.Append(selectList.Length == 0 ? " " : ",");
+                                        if (!string.IsNullOrEmpty(col.Collation))
                                         {
-                                            selectList.Append(col.ToString()).Append(" COLLATE ").Append(
-                                                destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col.ToString());
+                                            lock (objLock)
+                                            {
+                                                selectList.Append(col.ToString()).Append(" COLLATE ").Append(
+                                                    destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col.ToString());
+                                            }
+                                        }
+                                        else
+                                        {
+                                            selectList.Append(col.ToString());
                                         }
                                     }
-                                    else
-                                    {
-                                        selectList.Append(col.ToString());
-                                    }
                                 }
+                                fields = selectList.ToString();
                             }
-                            fields = selectList.ToString();
                         }
 
                         var sql = $"SELECT{sTOP}{fields} FROM {item.Table} WITH(NOLOCK) {item.WhereFilter}";
                         var row = (DataGridViewRow)dataGridView1.Rows[0].Clone();
-                        row.SetValues(Properties.Resources.empty, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant());
+                        row.SetValues(Properties.Resources.empty, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant(), TOP);
                         CopyRows.Add(row);
                         if (CURRENTTHREAD == 0)
                         {
                             //Prevent "ContextSwitchDeadlock Was Detected" exceptions
-                            if ((DateTime.Now - lastRefresh).TotalSeconds > 9)
+                            if ((DateTime.Now - lastRefresh).TotalSeconds > 2)
                             {
+                                var calculating = dataGridView1.Rows[0].Cells[1].Value.ToString();
+                                calculating += ".";
+                                if (calculating.EndsWith("...."))
+                                {
+                                    calculating = calculating.Replace("....", "");
+                                }
+                                dataGridView1.Rows[0].Cells[1].Value = calculating;
                                 Application.DoEvents();
                                 lastRefresh = DateTime.Now;
                             }
@@ -181,24 +203,16 @@ namespace Sql2SqlCloner
 
         private void btnNext_Click(object sender, EventArgs e)
         {
-            if (btnNext.Text == "Start over")
-            {
-                DialogResult = DialogResult.Retry;
-                Close();
-            }
-            else
-            {
-                btnNext.Enabled = false;
-                Cursor = Cursors.WaitCursor;
-                backgroundWorker1.DoWork += backgroundWorker1_DoWork;
-                backgroundWorker1.RunWorkerCompleted += backgroundWorker1_RunWorkerCompleted;
-                backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
-                backgroundWorker1.WorkerSupportsCancellation = true;
-                backgroundWorker1.WorkerReportsProgress = true;
-                label1.Text = "Copying data in progress...";
-                progressBar1.Value = 0;
-                backgroundWorker1.RunWorkerAsync();
-            }
+            btnNext.Enabled = false;
+            Cursor = Cursors.WaitCursor;
+            backgroundWorker1.DoWork += backgroundWorker1_DoWork;
+            backgroundWorker1.RunWorkerCompleted += backgroundWorker1_RunWorkerCompleted;
+            backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
+            backgroundWorker1.WorkerSupportsCancellation = true;
+            backgroundWorker1.WorkerReportsProgress = true;
+            label1.Text = "Copying data in progress from: '" + SchemaTransfer.SourceCxInfo() + "' to: '" + SchemaTransfer.DestinationCxInfo() + "'";
+            progressBar1.Value = 0;
+            backgroundWorker1.RunWorkerAsync();
         }
 
         private void backgroundWorker1_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
@@ -225,7 +239,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     var tableName = item.Cells["Table"].Value.ToString();
-                    currentlyCopying = $"Copying {tableName.Replace("[", "").Replace("]", "")}...";
+                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()}.{tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}'";
                     DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
                     //enable table constraints for standalone tables to avoid a single fat transaction at the end
                     if (string.Equals(item.Cells["HasRelationships"].Value.ToString(), "false", StringComparison.InvariantCultureIgnoreCase))
@@ -233,16 +247,17 @@ namespace Sql2SqlCloner
                         DataTransfer.EnableTableConstraints(tableName);
                     }
                     item.Cells["Status"].Value = Properties.Resources.success;
-                    ((System.Drawing.Bitmap)item.Cells["Status"].Value).Tag = "OK";
+                    ((Bitmap)item.Cells["Status"].Value).Tag = "OK";
+                    item.Cells["Result"].Value = $"{item.Cells["TOP"].Value} records copied";
                 }
                 catch (Exception exc)
                 {
                     item.Cells["Status"].Value = Properties.Resources.failure;
-                    ((System.Drawing.Bitmap)item.Cells["Status"].Value).Tag = "ERROR";
-                    item.Cells["Error"].Value = exc.Message;
+                    ((Bitmap)item.Cells["Status"].Value).Tag = "ERROR";
+                    item.Cells["Result"].Value = exc.Message;
                     if (exc.InnerException != null)
                     {
-                        item.Cells["Error"].Value = exc.InnerException.Message;
+                        item.Cells["Result"].Value = exc.InnerException.Message;
                     }
 
                     errorCount++;
@@ -285,6 +300,16 @@ namespace Sql2SqlCloner
                 if (label1.Text != currentlyCopying)
                 {
                     label1.Text = currentlyCopying;
+                    bool multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
+                    if (!multiline)
+                    {
+                        label1.Top = 10;
+                    }
+                    else
+                    {
+                        label1.Top = 3;
+                    }
+
                     label1.Refresh();
                 }
             }
@@ -298,7 +323,17 @@ namespace Sql2SqlCloner
                 stopwatch1.Stop();
                 Timer1.Stop();
                 Timer1_Tick(sender, e);
-                label1.Text = $"Operation completed {(errorCount == 0 ? "successfully" : $"with {errorCount} errors")}" +
+                string totalRecs = "";
+                if (errorCount == 0)
+                {
+                    //prevent out of range exception when counting processed records
+                    try
+                    {
+                        totalRecs = $" {CopyList.Select(t => t.RowCount).Sum()} records copied";
+                    }
+                    catch { }
+                }
+                label1.Text = $"Operation completed {(errorCount == 0 ? $"successfully.{totalRecs}" : $"with {errorCount} errors")}" +
                     (string.IsNullOrEmpty(lastError) ? "" : $". Last error was: {lastError}");
                 btnCancel.Text = "Close";
                 dataGridView1.Refresh();
@@ -338,8 +373,8 @@ namespace Sql2SqlCloner
                         label2.Text += $", Total running time {(timeDiff.Days == 0 ? "" : timeDiff.Days + " days ") + timeDiff.ToString("hh\\:mm\\:ss")}";
                     }
                     MessageBox.Show(msgResult);
-                    btnNext.Text = "Start over";
-                    btnNext.Enabled = true;
+                    btnPause.Text = "Start over";
+                    btnCopyMessages.Visible = btnCopyMessages.Enabled = btnPause.Enabled = true;
                     btnCancel.Enabled = true;
                 }
                 else
@@ -368,7 +403,7 @@ namespace Sql2SqlCloner
 
         private void CopyTabledata_Load(object sender, EventArgs e)
         {
-            Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
+            Icon = Icon.FromHandle(Properties.Resources.Clone.Handle);
             dataGridView1.Columns[0].Width = 40;
             ((DataGridViewImageColumn)dataGridView1.Columns["Status"]).DefaultCellStyle.NullValue = null;
         }
@@ -401,11 +436,21 @@ namespace Sql2SqlCloner
                     if (firstRow)
                     {
                         firstRow = false;
+                        var colCounter = 0;
+                        foreach (DataGridViewColumn col in dataGridView1.Columns)
+                        {
+                            if (colCounter < 4)
+                            {
+                                if (colCounter > 0)
+                                {
+                                    sb.Append('\t');
+                                }
+                                colCounter++;
+                                sb.Append(col.Name);
+                            }
+                        }
                     }
-                    else
-                    {
-                        sb.Append(Environment.NewLine);
-                    }
+                    sb.Append(Environment.NewLine);
 
                     int counter = 0;
                     var firstCell = true;
@@ -430,7 +475,7 @@ namespace Sql2SqlCloner
                                 }
                                 else
                                 {
-                                    sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                                    sb.Append(((Bitmap)cell.Value).Tag?.ToString());
                                 }
                             }
                             else
@@ -440,28 +485,36 @@ namespace Sql2SqlCloner
                         }
                         counter++;
                     }
-                    Clipboard.SetText(sb.ToString());
                 }
             }
+            Clipboard.SetText(sb.ToString());
         }
 
         private void btnPause_Click(object sender, EventArgs e)
         {
-            if (btnPause.Text == "Pause")
+            if (btnPause.Text == "Start over")
             {
-                pause.Reset();
-                Timer1.Stop();
-                stopwatch1.Stop();
-                btnPause.Text = "Resume";
-                btnCopyMessages.Visible = true;
+                DialogResult = DialogResult.Retry;
+                Close();
             }
             else
             {
-                btnCopyMessages.Visible = false;
-                Timer1.Start();
-                stopwatch1.Start();
-                btnPause.Text = "Pause";
-                pause.Set();
+                if (btnPause.Text == "Pause")
+                {
+                    pause.Reset();
+                    Timer1.Stop();
+                    stopwatch1.Stop();
+                    btnPause.Text = "Resume";
+                    btnCopyMessages.Visible = true;
+                }
+                else
+                {
+                    btnCopyMessages.Visible = false;
+                    Timer1.Start();
+                    stopwatch1.Start();
+                    btnPause.Text = "Pause";
+                    pause.Set();
+                }
             }
         }
 
@@ -471,7 +524,9 @@ namespace Sql2SqlCloner
             {
                 foreach (DataGridViewRow row in dataGridView1.Rows)
                 {
-                    row.Visible = !autoScrollGrid.Checked || !string.IsNullOrEmpty((string)row.Cells["Error"].Value);
+                    row.Visible = !autoScrollGrid.Checked ||
+                       (!string.IsNullOrEmpty((string)row.Cells["Result"].Value) &&
+                       ((Bitmap)row.Cells["Status"].Value).Tag?.ToString() == "ERROR");
                 }
             }
         }

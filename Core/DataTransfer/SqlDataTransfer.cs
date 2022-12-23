@@ -19,14 +19,13 @@ namespace Sql2SqlCloner.Core.DataTransfer
             DestinationConnectionString = dest;
             sourceConnection = new ServerConnection(new SqlConnection(src));
             destinationConnection = new ServerConnection(new SqlConnection(dest));
-            destinationConnection.SqlConnectionObject.Open();
         }
 
         public void EnableTableConstraints(string tableName)
         {
             try
             {
-                new SqlCommand($"ALTER TABLE {tableName} WITH CHECK CHECK CONSTRAINT all", destinationConnection.SqlConnectionObject)
+                new SqlCommand($"ALTER TABLE {tableName} WITH CHECK CHECK CONSTRAINT all", DestinationConnection.SqlConnectionObject)
                 {
                     CommandTimeout = SqlTimeout
                 }.ExecuteNonQuery();
@@ -62,6 +61,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     EnableDestinationConstraints();
                     finished = true;
                     RunInDestination(SQLEnableConstraints);
+                    EnableDestinationDDLTriggers();
                 }
                 catch (Exception ex)
                 {
@@ -97,7 +97,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                             and pk_col.object_id = fk_cols.referenced_object_id
                             order by 5,3,1,2";
 
-                        using (SqlCommand command = destinationConnection.SqlConnectionObject.CreateCommand())
+                        using (SqlCommand command = DestinationConnection.SqlConnectionObject.CreateCommand())
                         {
                             command.CommandText = sql;
                             command.CommandTimeout = SqlTimeout;
@@ -133,7 +133,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                             var deletedrows = 0;
                             using (SqlCommand cmdDelete = new SqlCommand())
                             {
-                                cmdDelete.Connection = destinationConnection.SqlConnectionObject;
+                                cmdDelete.Connection = DestinationConnection.SqlConnectionObject;
                                 cmdDelete.CommandTimeout = SqlTimeout;
                                 lstDelete.ForEach(deletecommand =>
                                 {
@@ -168,11 +168,6 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
         private IEnumerable<string> GetSchema(SqlConnection connection, string tableName)
         {
-            if (connection.State != ConnectionState.Open)
-            {
-                connection.Open();
-            }
-
             using (SqlCommand command = connection.CreateCommand())
             {
                 command.CommandText = @"select sche.name schemaName, tab.name tableName, col.name colName,
@@ -204,11 +199,6 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
         private string GetMasterHistoryTable(SqlConnection connection, string tableName)
         {
-            if (connection.State != ConnectionState.Open)
-            {
-                connection.Open();
-            }
-
             using (SqlCommand command = connection.CreateCommand())
             {
                 command.CommandText = @"select QUOTENAME(sche.name) + '.' + QUOTENAME(tab.name) AS MasterHistoryTable
@@ -227,7 +217,6 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 using (var reader = command.ExecuteReader())
                 {
                     if (reader.Read())
-
                     {
                         return (string)reader["MasterHistoryTable"];
                     }
@@ -254,10 +243,10 @@ namespace Sql2SqlCloner.Core.DataTransfer
                         BulkCopyTimeout = SqlTimeout
                     };
                 }
-                var masterhistorytable = GetMasterHistoryTable(destinationConnection.SqlConnectionObject, table);
+                var masterhistorytable = GetMasterHistoryTable(DestinationConnection.SqlConnectionObject, table);
                 if (!string.IsNullOrEmpty(masterhistorytable))
                 {
-                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = OFF)", destinationConnection.SqlConnectionObject)
+                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = OFF)", DestinationConnection.SqlConnectionObject)
                     {
                         CommandTimeout = SqlTimeout
                     }.ExecuteNonQuery();
@@ -265,10 +254,10 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
                 BulkCopy.DestinationTableName = table;
                 BulkCopy.ColumnMappings.Clear();
-                GetMapping(sourceConnection.SqlConnectionObject, destinationConnection.SqlConnectionObject, table).ToList().
+                GetMapping(SourceConnection.SqlConnectionObject, DestinationConnection.SqlConnectionObject, table).ToList().
                     ForEach(columnName => BulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(columnName, columnName)));
 
-                using (SqlCommand myCommand = new SqlCommand(query, sourceConnection.SqlConnectionObject))
+                using (SqlCommand myCommand = new SqlCommand(query, SourceConnection.SqlConnectionObject))
                 {
                     myCommand.CommandTimeout = SqlTimeout;
                     reader = myCommand.ExecuteReader();
@@ -278,7 +267,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
                 if (!string.IsNullOrEmpty(masterhistorytable))
                 {
-                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = ON (HISTORY_TABLE = {table}, DATA_CONSISTENCY_CHECK = ON))", destinationConnection.SqlConnectionObject)
+                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = ON (HISTORY_TABLE = {table}, DATA_CONSISTENCY_CHECK = ON))", DestinationConnection.SqlConnectionObject)
                     {
                         CommandTimeout = SqlTimeout
                     }.ExecuteNonQuery();

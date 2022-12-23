@@ -34,3 +34,5 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.autoScrollGrid_CheckedChanged(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.MFAConnection")]
 [assembly: SuppressMessage("General", "RCS1118:Mark local variable as const.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.MFAConnection")]
+[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.txtDestination_TextChanged(System.Object,System.EventArgs)")]
+[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.txtSource_TextChanged(System.Object,System.EventArgs)")]

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -16,7 +17,7 @@ namespace Sql2SqlCloner
     public partial class CopySchema : Form
     {
         public List<SqlSchemaObject> CopyList { get; }
-        private readonly SqlSchemaTransfer transfer;
+        private readonly SqlSchemaTransfer SchemaTransfer;
         private readonly bool closeIfSuccess;
         private readonly bool disableNotForReplication;
         private string lastError = "";
@@ -37,7 +38,7 @@ namespace Sql2SqlCloner
             InitializeComponent();
             this.disableNotForReplication = disableNotForReplication;
             this.closeIfSuccess = closeIfSuccess;
-            transfer = transferSchema;
+            SchemaTransfer = transferSchema;
             CopyList = lstObjects.ToList();
 
             if (!Properties.Settings.Default.CopySecurity)
@@ -82,7 +83,7 @@ namespace Sql2SqlCloner
             backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
             backgroundWorker1.WorkerSupportsCancellation = true;
             backgroundWorker1.WorkerReportsProgress = true;
-            currentlyCopying = label1.Text = "Processing schema...";
+            currentlyCopying = label1.Text = "Copying schema...";
             progressBar1.Value = 0;
             backgroundWorker1.RunWorkerAsync();
         }
@@ -90,11 +91,11 @@ namespace Sql2SqlCloner
         public void DeleteCallback(NamedSmoObject currObject)
         {
             var item = dataGridView1.Rows[0].DataBoundItem as SqlSchemaObject;
-            if (item.Name.Length >= 20)
-            {
-                item.Name = "Clearing database";
-            }
             item.Name += ".";
+            if (item.Name.EndsWith("...."))
+            {
+                item.Name = item.Name.Replace("....", "");
+            }
             item.Type = currObject.GetType().Name;
             item.Object = currObject;
             if (IsHandleCreated)
@@ -113,7 +114,7 @@ namespace Sql2SqlCloner
                 {
                     Name = "Clearing database",
                     Type = "Database",
-                    Object = new Database() { Name = transfer.destinationConnection.DatabaseName },
+                    Object = new Database() { Name = SchemaTransfer.DestinationConnection.DatabaseName },
                     Status = Properties.Resources.waiting
                 });
 
@@ -123,7 +124,7 @@ namespace Sql2SqlCloner
                 backgroundWorker1.ReportProgress(0);
                 try
                 {
-                    transfer.ClearDestinationDatabase(callback: DeleteCallback);
+                    SchemaTransfer.ClearDestinationDatabase(callback: DeleteCallback);
                 }
                 catch (Exception ex)
                 {
@@ -134,9 +135,9 @@ namespace Sql2SqlCloner
                 RefreshDataGrid();
             }
             backgroundWorker1.ReportProgress(0);
-            currentlyCopying = "Processing schema...";
+            currentlyCopying = "Copying schema from: '" + SchemaTransfer.SourceCxInfo() + "' to: '" + SchemaTransfer.DestinationCxInfo() + "'";
             bool overrideCollation = false, useSourceCollation = false;
-            transfer.NoCollation = false;
+            SchemaTransfer.NoCollation = false;
             switch (Properties.Settings.Default.CopyCollation)
             {
                 //ignore collation, do nothing
@@ -146,12 +147,12 @@ namespace Sql2SqlCloner
                 //no collation
                 case SqlCollationAction.Keep_source_db_collation:
                     overrideCollation = useSourceCollation = false;
-                    transfer.NoCollation = false;
+                    SchemaTransfer.NoCollation = false;
                     break;
                 //override collation, use source db
                 case SqlCollationAction.No_collation:
                     overrideCollation = useSourceCollation = true;
-                    transfer.NoCollation = true;
+                    SchemaTransfer.NoCollation = true;
                     break;
                 //override collation, use destination db (source collation will be converted at SELECT time)
                 case SqlCollationAction.Set_destination_db_collation:
@@ -159,9 +160,9 @@ namespace Sql2SqlCloner
                     useSourceCollation = false;
                     break;
             }
-            transfer.IncludeExtendedProperties = Properties.Settings.Default.CopyExtendedProperties;
-            transfer.IncludePermissions = Properties.Settings.Default.CopyPermissions;
-            transfer.IgnoreFileGroup = Properties.Settings.Default.IgnoreFileGroup;
+            SchemaTransfer.IncludeExtendedProperties = Properties.Settings.Default.CopyExtendedProperties;
+            SchemaTransfer.IncludePermissions = Properties.Settings.Default.CopyPermissions;
+            SchemaTransfer.IgnoreFileGroup = Properties.Settings.Default.IgnoreFileGroup;
             double max = CopyList.Count;
             var CopyConstraints = Properties.Settings.Default.CopyConstraints;
             if (CopyConstraints)
@@ -188,7 +189,7 @@ namespace Sql2SqlCloner
 
             //system-versioned history tables will be created automatically, remove them
             foreach (Table systemhistorytable in currList.Select(o => o.Object).OfType<Table>().Where(table =>
-                transfer.GetTableProperty(table, "IsSystemVersioned")).ToList())
+                SchemaTransfer.GetTableProperty(table, "IsSystemVersioned")).ToList())
             {
                 currList.Remove(currList.First(t => (t.Object is Table table) && table.ID == systemhistorytable.HistoryTableID));
             }
@@ -229,9 +230,13 @@ namespace Sql2SqlCloner
                         }
                         try
                         {
-                            transfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
+                            SchemaTransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
                             item.Status = Properties.Resources.success;
                             item.Status.Tag = "OK";
+                            if (item.Object is DatabaseDdlTrigger)
+                            {
+                                SchemaTransfer.RunInDestination($"SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' from sys.triggers WHERE name='{item.Name}'");
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -302,7 +307,7 @@ namespace Sql2SqlCloner
                             currrow++;
                         }
                     }
-                    lstDelete.ForEach(t => new SqlCommand(t, transfer.destinationConnection.SqlConnectionObject).ExecuteNonQuery());
+                    lstDelete.ForEach(t => new SqlCommand(t, SchemaTransfer.DestinationConnection.SqlConnectionObject).ExecuteNonQuery());
                     lstDelete.Clear();
                     previousListCount = currList.Count;
                     finishedPass1 = errorCount == 0 || errorCount == currList.Count;
@@ -315,7 +320,7 @@ namespace Sql2SqlCloner
                     {
                         return;
                     }
-                    transfer.RefreshDestination();
+                    SchemaTransfer.RefreshDestination();
                     currentlyCopying = "Processing indexes...";
                     //tables should go first
                     foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").OrderBy(ix => ix.Type).ToList())
@@ -323,7 +328,7 @@ namespace Sql2SqlCloner
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
-                            transfer.ApplyIndexes(item.Object, Properties.Settings.Default.CopyFullText && Properties.Settings.Default.CopyConstraints);
+                            SchemaTransfer.ApplyIndexes(item.Object, Properties.Settings.Default.CopyFullText && Properties.Settings.Default.CopyConstraints);
                         }
                         catch (Exception ex)
                         {
@@ -342,7 +347,7 @@ namespace Sql2SqlCloner
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
-                            transfer.ApplyForeignKeys(item.Object, disableNotForReplication);
+                            SchemaTransfer.ApplyForeignKeys(item.Object, disableNotForReplication);
                         }
                         catch (Exception ex)
                         {
@@ -364,7 +369,7 @@ namespace Sql2SqlCloner
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
-                            transfer.ApplyChecks(item.Object, disableNotForReplication);
+                            SchemaTransfer.ApplyChecks(item.Object, disableNotForReplication);
                             backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
                         }
                         catch (Exception ex)
@@ -396,7 +401,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     backgroundWorker1.ReportProgress((int)(current / max * 100.0));
-                    transfer.CopyExtendedProperties(CopyList.ConvertAll(o => o.Object));
+                    SchemaTransfer.CopyExtendedProperties(CopyList.ConvertAll(o => o.Object));
                     backgroundWorker1.ReportProgress((int)((current += CopyList.Count / 5.0) / max * 100.0));
                 }
                 catch (Exception ex)
@@ -417,7 +422,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     //not needed transfer.CopyPermissions();
-                    transfer.CopyRolePermissions();
+                    SchemaTransfer.CopyRolePermissions();
                     backgroundWorker1.ReportProgress((int)((current += CopyList.Count / 6.0) / max * 100.0));
                 }
                 catch (Exception ex)
@@ -430,19 +435,20 @@ namespace Sql2SqlCloner
                     errorCount++;
                 }
             }
-            transfer.EnableDestinationConstraints();
+            SchemaTransfer.EnableDestinationConstraints();
             if (string.Equals(ConfigurationManager.AppSettings["DisableDisabledObjects"], "true", StringComparison.OrdinalIgnoreCase))
             {
-                transfer.DisableDisabledObjects();
+                SchemaTransfer.DisableDisabledObjects();
             }
             if (Properties.Settings.Default.CopySecurity)
             {
-                transfer.CopySchemaAuthorization();
+                SchemaTransfer.CopySchemaAuthorization();
             }
             if (Properties.Settings.Default.CopyData)
             {
-                transfer.RemoveSchemaBindingFromDestination();
+                SchemaTransfer.RemoveSchemaBindingFromDestination();
             }
+            SchemaTransfer.EnableDestinationDDLTriggers();
             percentage = 100;
             backgroundWorker1.ReportProgress(100);
         }
@@ -592,14 +598,8 @@ namespace Sql2SqlCloner
                 {
                     if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"].Equals("true", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        var server = transfer.destinationConnection.SqlConnectionObject.DataSource;
-                        if (server == ".")
-                        {
-                            server = "localhost";
-                        }
-
                         if (MessageBox.Show(
-                            $"The database {server}.{transfer.destinationConnection.DatabaseName} is about to be cleared. Continue?",
+                            $"The database '{SchemaTransfer.DestinationCxInfo()}' is about to be cleared. Continue?",
                             "Database deletion",
                             MessageBoxButtons.OKCancel) == DialogResult.Cancel)
                         {
@@ -611,7 +611,7 @@ namespace Sql2SqlCloner
                 }
             }
 
-            Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
+            Icon = Icon.FromHandle(Properties.Resources.Clone.Handle);
             RefreshDataGrid();
         }
 
@@ -664,11 +664,18 @@ namespace Sql2SqlCloner
                     if (firstRow)
                     {
                         firstRow = false;
+                        var colCounter = 0;
+                        foreach (DataGridViewColumn col in dataGridView1.Columns)
+                        {
+                            if (colCounter > 0)
+                            {
+                                sb.Append('\t');
+                            }
+                            colCounter++;
+                            sb.Append(col.Name);
+                        }
                     }
-                    else
-                    {
-                        sb.Append(Environment.NewLine);
-                    }
+                    sb.Append(Environment.NewLine);
 
                     var firstCell = true;
                     foreach (DataGridViewCell cell in row.Cells)
@@ -690,7 +697,7 @@ namespace Sql2SqlCloner
                             }
                             else
                             {
-                                sb.Append(((System.Drawing.Bitmap)cell.Value).Tag.ToString());
+                                sb.Append(((Bitmap)cell.Value).Tag?.ToString());
                             }
                         }
                         else

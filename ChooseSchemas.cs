@@ -4,6 +4,7 @@ using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -509,7 +510,7 @@ namespace Sql2SqlCloner
         private void ChooseSchemas_Load(object sender, EventArgs e)
         {
             Enum.GetNames(typeof(SqlCollationAction)).ToList().ForEach(n => copyCollation.Items.Add(n.Replace("_", " ")));
-            Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
+            Icon = Icon.FromHandle(Properties.Resources.Clone.Handle);
             copyConstraints.Checked = Properties.Settings.Default.CopyConstraints;
             copyFullText.Checked = Properties.Settings.Default.CopyFullText;
             dropAndRecreateObjects.Checked = Properties.Settings.Default.DropAndRecreateObjects;

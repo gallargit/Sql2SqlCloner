@@ -9,6 +9,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
         public string SqlCommand { get; set; }
         public long TopRecords { get; set; }
         public string WhereFilter { get; set; }
+        public long RowCount { get; set; }
         public bool HasRelationships { get; set; }
         public string Error { get; set; }
     }

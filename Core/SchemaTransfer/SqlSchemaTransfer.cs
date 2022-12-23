@@ -180,7 +180,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 string.IsNullOrWhiteSpace(password) ?
                     (ConfigurationManager.AppSettings["DefaultPassword"] ?? "D3F@u1TP@s$W0rd!")
                     : password),
-                destinationConnection.SqlConnectionObject).ExecuteNonQuery();
+                DestinationConnection.SqlConnectionObject).ExecuteNonQuery();
         }
 
         public void CreateObject(NamedSmoObject obj, bool dropIfExists, bool overrideCollation, bool useSourceCollation,
@@ -188,7 +188,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         {
             using (SqlCommand command = new SqlCommand())
             {
-                command.Connection = destinationConnection.SqlConnectionObject;
+                command.Connection = DestinationConnection.SqlConnectionObject;
                 if ((obj is User && new string[] { "dbo", "INFORMATION_SCHEMA", "guest", "sys" }.Contains(obj.Name)) ||
                     (obj is DatabaseRole && new string[] { "db_accessadmin", "db_backupoperator", "db_datareader", "db_datawriter",
                     "db_ddladmin", "db_denydatareader", "db_denydatawriter", "db_owner", "db_securityadmin", "public" }.Contains(obj.Name)))
@@ -381,6 +381,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     return "COLUMN MASTER KEY";
                 case "ColumnEncryptionKey":
                     return "COLUMN ENCRYPTION KEY";
+                case "DatabaseDdlTrigger":
+                    return "TRIGGER";
             }
             return objType.ToUpperInvariant();
         }
@@ -1222,7 +1224,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     (GetDestinationTableOrViewByName(sTable) as Table).TrackColumnsUpdatedEnabled = true;
                 }
                 */
-                new SqlCommand($"ALTER TABLE {obj} ENABLE CHANGE_TRACKING WITH(TRACK_COLUMNS_UPDATED = {(sTab.TrackColumnsUpdatedEnabled ? "ON" : "OFF")})", destinationConnection.SqlConnectionObject).ExecuteNonQuery();
+                new SqlCommand($"ALTER TABLE {obj} ENABLE CHANGE_TRACKING WITH(TRACK_COLUMNS_UPDATED = {(sTab.TrackColumnsUpdatedEnabled ? "ON" : "OFF")})", DestinationConnection.SqlConnectionObject).ExecuteNonQuery();
             }
 
             if (CopyFullText)
@@ -1339,7 +1341,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         public void RefreshDestinationObjects()
         {
             RefreshDestination();
-            DestinationObjects = GetSqlObjects(destinationConnection, destinationDatabase);
+            DestinationObjects = GetSqlObjects(DestinationConnection, destinationDatabase);
         }
 
         public void RefreshAll()
@@ -1353,7 +1355,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 sourceDatabase.PrefetchObjects(typeof(Table), new ScriptingOptions());
                 if (!token.IsCancellationRequested)
                 {
-                    SourceObjects = GetSqlObjects(sourceConnection, sourceDatabase);
+                    SourceObjects = GetSqlObjects(SourceConnection, sourceDatabase);
                 }
             });
             if (sameserver || (ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() != "true"))
@@ -1365,7 +1367,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 if (!token.IsCancellationRequested)
                 {
-                    DestinationObjects = GetSqlObjects(destinationConnection, destinationDatabase);
+                    DestinationObjects = GetSqlObjects(DestinationConnection, destinationDatabase);
                 }
             });
 
@@ -1402,7 +1404,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
                 else
                 {
-                    //get all objects to remove placing schemas at the end
+                    //get all objects to remove placing schemas at the end and database triggers at the beginning
                     destinations = transferDrop.DestinationObjects.ConvertAll(o => o.Object).Where(p => !(p is Schema))
                            .Union(transferDrop.DestinationObjects.ConvertAll(s => s.Object)
                            .Where(t => t is Schema)).ToList();
@@ -1412,14 +1414,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     try
                     {
-                        if (lstDelete == null)
-                        {
-                            transferDrop.DisableAllDestinationConstraints();
-                        }
-
                         using (SqlCommand command = new SqlCommand())
                         {
-                            command.Connection = transferDrop.destinationConnection.SqlConnectionObject;
+                            command.Connection = transferDrop.DestinationConnection.SqlConnectionObject;
                             command.CommandTimeout = SqlTimeout;
                             if (lstDelete == null)
                             {
@@ -1444,6 +1441,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                     }
                                 }
                             }
+
                             var processed = destinations.Count;
                             while (processed > 0)
                             {
@@ -1516,6 +1514,25 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 throw new Exception($"Could not delete items{lastError}");
             }
+        }
+
+        private string FormatInstance(string instanceName)
+        {
+            if (instanceName == ".")
+            {
+                return "(local)";
+            }
+            return instanceName;
+        }
+
+        public string SourceCxInfo()
+        {
+            return FormatInstance(sourceConnection.ServerInstance) + "." + sourceConnection.DatabaseName;
+        }
+
+        public string DestinationCxInfo()
+        {
+            return FormatInstance(destinationConnection.ServerInstance) + "." + destinationConnection.DatabaseName;
         }
     }
 }

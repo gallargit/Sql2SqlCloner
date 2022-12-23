@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data.Common;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -96,7 +97,7 @@ namespace Sql2SqlCloner
 
         private void ChooseConnections_Load(object sender, EventArgs e)
         {
-            Icon = System.Drawing.Icon.FromHandle(Properties.Resources.Clone.Handle);
+            Icon = Icon.FromHandle(Properties.Resources.Clone.Handle);
             sourceConnection = Properties.Settings.Default.SourceServer;
             txtSource.Text = GetConnection(sourceConnection);
             destinationConnection = Properties.Settings.Default.DestinationServer;
@@ -279,7 +280,8 @@ namespace Sql2SqlCloner
                                 Table = item.Object.ToString(),
                                 TopRecords = ((SqlSchemaTable)item).TopRecords,
                                 WhereFilter = ((SqlSchemaTable)item).WhereFilter,
-                                HasRelationships = ((SqlSchemaTable)item).HasRelationships
+                                HasRelationships = ((SqlSchemaTable)item).HasRelationships,
+                                RowCount = ((SqlSchemaTable)item).RowCount
                             })
                         );
                         if (itemsToCopy.Count == 0)

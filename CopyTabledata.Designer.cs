@@ -39,8 +39,9 @@
             this.Status = new System.Windows.Forms.DataGridViewImageColumn();
             this.Table = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.SqlCommand = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Error = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Result = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.HasRelationships = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.TOP = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Timer1 = new System.Windows.Forms.Timer(this.components);
             this.btnCopyMessages = new System.Windows.Forms.Button();
             this.btnPause = new System.Windows.Forms.Button();
@@ -52,9 +53,10 @@
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnNext.Enabled = false;
-            this.btnNext.Location = new System.Drawing.Point(516, 276);
+            this.btnNext.Location = new System.Drawing.Point(688, 340);
+            this.btnNext.Margin = new System.Windows.Forms.Padding(4);
             this.btnNext.Name = "btnNext";
-            this.btnNext.Size = new System.Drawing.Size(75, 23);
+            this.btnNext.Size = new System.Drawing.Size(100, 28);
             this.btnNext.TabIndex = 3;
             this.btnNext.Text = "Copy";
             this.btnNext.UseVisualStyleBackColor = true;
@@ -64,17 +66,20 @@
             // 
             this.progressBar1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar1.Location = new System.Drawing.Point(12, 242);
+            this.progressBar1.Location = new System.Drawing.Point(16, 298);
+            this.progressBar1.Margin = new System.Windows.Forms.Padding(4);
             this.progressBar1.Name = "progressBar1";
-            this.progressBar1.Size = new System.Drawing.Size(660, 23);
+            this.progressBar1.Size = new System.Drawing.Size(880, 28);
             this.progressBar1.TabIndex = 6;
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(9, 9);
+            this.label1.Location = new System.Drawing.Point(14, 14);
+            this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label1.MaximumSize = new System.Drawing.Size(772, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(70, 13);
+            this.label1.Size = new System.Drawing.Size(85, 16);
             this.label1.TabIndex = 7;
             this.label1.Text = "Please wait...";
             // 
@@ -82,9 +87,10 @@
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.Enabled = false;
-            this.btnCancel.Location = new System.Drawing.Point(598, 276);
+            this.btnCancel.Location = new System.Drawing.Point(797, 340);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(4);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(74, 23);
+            this.btnCancel.Size = new System.Drawing.Size(99, 28);
             this.btnCancel.TabIndex = 5;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
@@ -94,9 +100,10 @@
             // 
             this.label2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(20, 280);
+            this.label2.Location = new System.Drawing.Point(27, 345);
+            this.label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(21, 13);
+            this.label2.Size = new System.Drawing.Size(26, 16);
             this.label2.TabIndex = 9;
             this.label2.Text = "0%";
             // 
@@ -116,21 +123,24 @@
             this.Status,
             this.Table,
             this.SqlCommand,
-            this.Error,
-            this.HasRelationships});
-            this.dataGridView1.Location = new System.Drawing.Point(12, 36);
+            this.Result,
+            this.HasRelationships,
+            this.TOP});
+            this.dataGridView1.Location = new System.Drawing.Point(16, 44);
+            this.dataGridView1.Margin = new System.Windows.Forms.Padding(4);
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersWidth = 25;
             this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dataGridView1.ShowEditingIcon = false;
-            this.dataGridView1.Size = new System.Drawing.Size(660, 194);
+            this.dataGridView1.Size = new System.Drawing.Size(880, 239);
             this.dataGridView1.TabIndex = 0;
             // 
             // Status
             // 
             this.Status.FillWeight = 101.5228F;
             this.Status.HeaderText = "Status";
+            this.Status.MinimumWidth = 6;
             this.Status.Name = "Status";
             this.Status.ReadOnly = true;
             // 
@@ -138,6 +148,7 @@
             // 
             this.Table.FillWeight = 99.49238F;
             this.Table.HeaderText = "Table";
+            this.Table.MinimumWidth = 6;
             this.Table.Name = "Table";
             this.Table.ReadOnly = true;
             // 
@@ -145,22 +156,33 @@
             // 
             this.SqlCommand.FillWeight = 99.49238F;
             this.SqlCommand.HeaderText = "SqlCommand";
+            this.SqlCommand.MinimumWidth = 6;
             this.SqlCommand.Name = "SqlCommand";
             this.SqlCommand.ReadOnly = true;
             // 
-            // Error
+            // Result
             // 
-            this.Error.FillWeight = 99.49238F;
-            this.Error.HeaderText = "Error";
-            this.Error.Name = "Error";
-            this.Error.ReadOnly = true;
+            this.Result.FillWeight = 99.49238F;
+            this.Result.HeaderText = "Result";
+            this.Result.MinimumWidth = 6;
+            this.Result.Name = "Result";
+            this.Result.ReadOnly = true;
             // 
             // HasRelationships
             // 
             this.HasRelationships.HeaderText = "HasRelationships";
+            this.HasRelationships.MinimumWidth = 6;
             this.HasRelationships.Name = "HasRelationships";
             this.HasRelationships.ReadOnly = true;
             this.HasRelationships.Visible = false;
+            // 
+            // TOP
+            // 
+            this.TOP.HeaderText = "TOP";
+            this.TOP.MinimumWidth = 6;
+            this.TOP.Name = "TOP";
+            this.TOP.ReadOnly = true;
+            this.TOP.Visible = false;
             // 
             // Timer1
             // 
@@ -171,9 +193,10 @@
             // 
             this.btnCopyMessages.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCopyMessages.Enabled = false;
-            this.btnCopyMessages.Location = new System.Drawing.Point(330, 276);
+            this.btnCopyMessages.Location = new System.Drawing.Point(461, 340);
+            this.btnCopyMessages.Margin = new System.Windows.Forms.Padding(4);
             this.btnCopyMessages.Name = "btnCopyMessages";
-            this.btnCopyMessages.Size = new System.Drawing.Size(111, 23);
+            this.btnCopyMessages.Size = new System.Drawing.Size(127, 28);
             this.btnCopyMessages.TabIndex = 1;
             this.btnCopyMessages.Text = "Copy messages";
             this.btnCopyMessages.UseVisualStyleBackColor = true;
@@ -184,9 +207,10 @@
             // 
             this.btnPause.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnPause.Enabled = false;
-            this.btnPause.Location = new System.Drawing.Point(446, 276);
+            this.btnPause.Location = new System.Drawing.Point(595, 340);
+            this.btnPause.Margin = new System.Windows.Forms.Padding(4);
             this.btnPause.Name = "btnPause";
-            this.btnPause.Size = new System.Drawing.Size(64, 23);
+            this.btnPause.Size = new System.Drawing.Size(85, 28);
             this.btnPause.TabIndex = 2;
             this.btnPause.Text = "Pause";
             this.btnPause.UseVisualStyleBackColor = true;
@@ -197,9 +221,10 @@
             this.autoScrollGrid.AutoSize = true;
             this.autoScrollGrid.Checked = true;
             this.autoScrollGrid.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.autoScrollGrid.Location = new System.Drawing.Point(597, 13);
+            this.autoScrollGrid.Location = new System.Drawing.Point(796, 16);
+            this.autoScrollGrid.Margin = new System.Windows.Forms.Padding(4);
             this.autoScrollGrid.Name = "autoScrollGrid";
-            this.autoScrollGrid.Size = new System.Drawing.Size(75, 17);
+            this.autoScrollGrid.Size = new System.Drawing.Size(91, 20);
             this.autoScrollGrid.TabIndex = 10;
             this.autoScrollGrid.Text = "Auto scroll";
             this.autoScrollGrid.UseVisualStyleBackColor = true;
@@ -207,9 +232,9 @@
             // 
             // CopyTabledata
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(684, 311);
+            this.ClientSize = new System.Drawing.Size(912, 383);
             this.Controls.Add(this.autoScrollGrid);
             this.Controls.Add(this.btnPause);
             this.Controls.Add(this.btnCopyMessages);
@@ -219,6 +244,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.progressBar1);
             this.Controls.Add(this.btnNext);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "CopyTabledata";
@@ -239,14 +265,15 @@
         private System.Windows.Forms.Button btnCancel;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.DataGridView dataGridView1;
-        private System.Windows.Forms.DataGridViewImageColumn Status;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Table;
-        private System.Windows.Forms.DataGridViewTextBoxColumn SqlCommand;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Error;
-        private System.Windows.Forms.DataGridViewTextBoxColumn HasRelationships;
         private System.Windows.Forms.Timer Timer1;
         private System.Windows.Forms.Button btnCopyMessages;
         private System.Windows.Forms.Button btnPause;
         private System.Windows.Forms.CheckBox autoScrollGrid;
+        private System.Windows.Forms.DataGridViewImageColumn Status;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Table;
+        private System.Windows.Forms.DataGridViewTextBoxColumn SqlCommand;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Result;
+        private System.Windows.Forms.DataGridViewTextBoxColumn HasRelationships;
+        private System.Windows.Forms.DataGridViewTextBoxColumn TOP;
     }
 }
