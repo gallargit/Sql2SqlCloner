@@ -530,5 +530,11 @@ namespace Sql2SqlCloner
                 }
             }
         }
+
+        private void dataGridView1_DataError(object sender, DataGridViewDataErrorEventArgs e)
+        {
+            //sometimes if the window is resized the datagrid creates new rows for no reason
+            //this prevents the default error window from being shown, as it blocks the whole process
+        }
     }
 }

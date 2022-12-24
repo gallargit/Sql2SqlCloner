@@ -35,6 +35,19 @@ https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks
 
 In the `app.config` file some parameters are included to demonstrate how to parametrize the application
 
+# Known issues
+Ever since Visual Studio release 17.4.2 sometimes the build process does not work properly, I think it's an error with MSBuild. When the application is compiled for the first time, two DLLs belonging to two nuget packages are not copied to the output directory, they are:
+- SqlServerSpatial160.dll (Microsoft.SqlServer.Types package)
+- Microsoft.Data.SqlClient.SNI.x64.dll (Microsoft.Data.SqlClient.SNI package)
+
+These two DLLs should be copied at build time, according to these two lines in the Csproj file:
+
+`<Import Project="packages\Microsoft.SqlServer.Types.160.1000.6\build\net462\Microsoft.SqlServer.Types.props" Condition="Exists('packages\Microsoft.SqlServer.Types.160.1000.6\build\net462\Microsoft.SqlServer.Types.props')" />`
+
+`<Import Project="packages\Microsoft.Data.SqlClient.SNI.5.0.1\build\net46\Microsoft.Data.SqlClient.SNI.targets" Condition="Exists('packages\Microsoft.Data.SqlClient.SNI.5.0.1\build\net46\Microsoft.Data.SqlClient.SNI.targets')" />`
+
+My guess is that the first time they are not copied because the packages have not been downloaded yet, and I could not figure out a way to force package download. If you first build; then rebuild the project, they will be copied and everything will work. But since this is annoying and inconvenient a quick workaround has been made in the `Loader.cs` file. If the DLLs are not present, they will be copied at runtime from the `packages` folder.
+
 # To be done
 * Ability to decrypt encrypted objects using DAC connection
 * Copy Azure databases using Azure Multi Factor Authentication as seen [here](https://stackoverflow.com/questions/60564462/how-to-connect-to-a-database-using-active-directory-login-and-multifactor-authen)
