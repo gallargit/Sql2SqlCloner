@@ -51,3 +51,4 @@ My guess is that the first time they are not copied because the packages have no
 # To be done
 * Ability to decrypt encrypted objects using DAC connection
 * Copy Azure databases using Azure Multi Factor Authentication as seen [here](https://stackoverflow.com/questions/60564462/how-to-connect-to-a-database-using-active-directory-login-and-multifactor-authen)
+* Decrypt and re-encrypt columns as seen here https://learn.microsoft.com/en-us/sql/t-sql/functions/decryptbykey-transact-sql?view=sql-server-ver16

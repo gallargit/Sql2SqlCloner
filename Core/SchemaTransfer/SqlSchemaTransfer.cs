@@ -232,8 +232,27 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     incompatibleErrorMsg = "Incompatible subitems in this object:";
                     foreach (var incobj in transfer.IncompatibleObjects)
                     {
-                        incompatibleErrorMsg += " " + incobj.Value.Substring(6 + incobj.Value.LastIndexOf("@Name="));
-                        incompatibleErrorMsg = incompatibleErrorMsg.Substring(0, incompatibleErrorMsg.Length - 1) + " (" + incobj.Type + ")";
+                        var incompatSchema = "";
+                        if (incobj.Value.IndexOf("@Schema=") > 0)
+                        {
+                            incompatSchema = incobj.Value.Substring(8 + incobj.Value.IndexOf("@Schema="));
+                            while (incompatSchema.Length > 0 && !incompatSchema.EndsWith("'"))
+                            {
+                                incompatSchema = incompatSchema.Substring(0, incompatSchema.Length - 1);
+                            }
+                            if (incompatSchema != "")
+                            {
+                                incompatSchema += ".";
+                            }
+                        }
+                        var objectName = incobj.Value.Substring(6 + incobj.Value.LastIndexOf("@Name="));
+                        var currindex = 1;
+                        while (objectName[currindex] != '\'')
+                        {
+                            currindex++;
+                        }
+                        objectName = objectName.Substring(0, currindex + 1);
+                        incompatibleErrorMsg += " " + incompatSchema + objectName;
                     }
                     transfer.IncompatibleObjects.Clear();
                 }

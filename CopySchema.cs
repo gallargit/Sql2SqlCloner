@@ -90,16 +90,16 @@ namespace Sql2SqlCloner
 
         public void DeleteCallback(NamedSmoObject currObject)
         {
-            var item = dataGridView1.Rows[0].DataBoundItem as SqlSchemaObject;
-            item.Name += ".";
-            if (item.Name.EndsWith("...."))
-            {
-                item.Name = item.Name.Replace("....", "");
-            }
-            item.Type = currObject.GetType().Name;
-            item.Object = currObject;
             if (IsHandleCreated)
             {
+                var item = dataGridView1.Rows[0].DataBoundItem as SqlSchemaObject;
+                item.Name += ".";
+                if (item.Name.EndsWith("...."))
+                {
+                    item.Name = item.Name.Replace("....", "");
+                }
+                item.Type = currObject.GetType().Name;
+                item.Object = currObject;
                 dataGridView1.Invoke(new Action(() => dataGridView1.Refresh()));
             }
         }
