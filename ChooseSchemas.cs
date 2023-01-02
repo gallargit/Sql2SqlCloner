@@ -72,11 +72,7 @@ namespace Sql2SqlCloner
             }
 
             LoadTreeNodes(SortByRecords);
-
-            if (autoRun || string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
-            {
-                AutoRun = true;
-            }
+            AutoRun = autoRun;
         }
 
         private string FormatCopyData(long ROWCOUNT, long TOP, string WHERE)

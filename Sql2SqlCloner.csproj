@@ -346,6 +346,7 @@
     </Compile>
     <Compile Include="Core\DataTransfer\SqlCollationAction.cs" />
     <Compile Include="Core\SchemaTransfer\SqlSchemaTable.cs" />
+    <Compile Include="Core\SchemaTransfer\TokenInfoExtended.cs" />
     <Compile Include="Core\SqlTransfer.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="SqlServerTypes\Loader.cs" />

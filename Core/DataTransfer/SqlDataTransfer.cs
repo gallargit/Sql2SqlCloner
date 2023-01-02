@@ -14,7 +14,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
         private SqlBulkCopy BulkCopy;
         private readonly string DestinationConnectionString;
 
-        public SqlDataTransfer(string src, string dest)
+        public SqlDataTransfer(string src, string dest, IList<string> lstPostExecutionExecute) : base(lstPostExecutionExecute)
         {
             DestinationConnectionString = dest;
             sourceConnection = new ServerConnection(new SqlConnection(src));
@@ -61,7 +61,8 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     EnableDestinationConstraints();
                     finished = true;
                     RunInDestination(SQLEnableConstraints);
-                    EnableDestinationDDLTriggers();
+                    //recreate objects, such as security policies
+                    LstPostExecutionExecute.ToList().ForEach(item => RunInDestination($"SELECT '{item}'"));
                 }
                 catch (Exception ex)
                 {

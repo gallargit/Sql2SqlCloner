@@ -32,7 +32,8 @@ namespace Sql2SqlCloner
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
         private readonly object objLock = new object();
 
-        public CopyTabledata(List<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer, bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
+        public CopyTabledata(List<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
+            bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
         {
             this.initialTime = initialTime;
             CopyList = list;

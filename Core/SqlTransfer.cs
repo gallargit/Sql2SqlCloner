@@ -3,6 +3,7 @@ using Microsoft.SqlServer.Management.Common;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
+using System.Linq;
 
 namespace Sql2SqlCloner.Core
 {
@@ -11,13 +12,15 @@ namespace Sql2SqlCloner.Core
         protected ServerConnection sourceConnection;
         protected ServerConnection destinationConnection;
         protected readonly int SqlTimeout;
+        public IList<string> LstPostExecutionExecute { get; } = new List<string>();
 
-        public SqlTransfer()
+        public SqlTransfer(IList<string> lstPostExecutionExecute)
         {
             if (!int.TryParse(ConfigurationManager.AppSettings["SqlTimeout"], out SqlTimeout))
             {
                 SqlTimeout = 1800; //30 minutes
             }
+            lstPostExecutionExecute?.ToList().ForEach(item => LstPostExecutionExecute.Add(item));
         }
 
         public ServerConnection SourceConnection

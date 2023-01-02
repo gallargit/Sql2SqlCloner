@@ -18,14 +18,16 @@ namespace Sql2SqlCloner
     {
         private string strtskSource, strtskDestination, sourceConnection, destinationConnection;
         private bool EnablePreload = ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() == "true";
+        private bool AutoRun;
         private Task<SqlSchemaTransfer> tskPreload;
         private readonly CancellationTokenSource tokenSource = new CancellationTokenSource();
-        private CancellationToken token;
+        private CancellationToken cancelToken;
 
         public ChooseConnections()
         {
             InitializeComponent();
             SqlServerTypes.Utilities.LoadNativeAssemblies(AppDomain.CurrentDomain.BaseDirectory);
+            AutoRun = string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase);
         }
 
         private string GetConnection(string conn)
@@ -116,7 +118,7 @@ namespace Sql2SqlCloner
             isData.Checked = Properties.Settings.Default.CopyData;
             trustServerCertificates.Checked = Properties.Settings.Default.AlwaysTrustServerCertificates;
 
-            if (string.Equals(ConfigurationManager.AppSettings["Autorun"], "true", StringComparison.InvariantCultureIgnoreCase))
+            if (sender != null && e != null && AutoRun)
             {
                 btnNext_Click(sender, e);
             }
@@ -127,7 +129,7 @@ namespace Sql2SqlCloner
                 {
                     EnablePreload = false;
                     strtskSource = strtskDestination = destinationConnection;
-                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token), token);
+                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, cancelToken), cancelToken);
                 }
             }
         }
@@ -161,7 +163,9 @@ namespace Sql2SqlCloner
 
         private void btnNext_Click(object sender, EventArgs e)
         {
-            var autoRun = ModifierKeys.HasFlag(Keys.Shift);
+            var autoRun = ModifierKeys.HasFlag(Keys.Shift) || AutoRun;
+            //global autorun should work only the first time
+            AutoRun = false;
             var initialTime = DateTime.Now;
             if (!isData.Checked && !isSchema.Checked)
             {
@@ -224,8 +228,8 @@ namespace Sql2SqlCloner
                 else
                 {
                     AbortBackgroundTask();
-                    token = new CancellationToken();
-                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, token);
+                    cancelToken = new CancellationToken();
+                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, cancelToken);
                 }
                 strtskSource = strtskDestination = null;
                 tskPreload = null;
@@ -303,7 +307,8 @@ namespace Sql2SqlCloner
                 List<SqlDataObject> itemsToCopy;
                 try
                 {
-                    datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer);
+                    datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer,
+                        schematransfer.LstPostExecutionExecute);
                     itemsToCopy = new List<SqlDataObject>();
                     if (tablesToCopy != null)
                     {
