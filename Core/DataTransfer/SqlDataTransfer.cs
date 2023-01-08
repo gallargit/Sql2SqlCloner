@@ -1,5 +1,4 @@
 ﻿using Microsoft.Data.SqlClient;
-using Microsoft.SqlServer.Management.Common;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -12,13 +11,9 @@ namespace Sql2SqlCloner.Core.DataTransfer
     public class SqlDataTransfer : SqlTransfer
     {
         private SqlBulkCopy BulkCopy;
-        private readonly string DestinationConnectionString;
 
-        public SqlDataTransfer(string src, string dest, IList<string> lstPostExecutionExecute) : base(lstPostExecutionExecute)
+        public SqlDataTransfer(string src, string dest, IList<string> lstPostExecutionExecute) : base(src, dest, lstPostExecutionExecute)
         {
-            DestinationConnectionString = dest;
-            sourceConnection = new ServerConnection(new SqlConnection(src));
-            destinationConnection = new ServerConnection(new SqlConnection(dest));
         }
 
         public void EnableTableConstraints(string tableName)
@@ -37,7 +32,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
         {
             //enable constraints one by one, this will enable all disabled constraints (which can be enabled)
             //in a broken database and also remove the untrusted bit in all keys
-            var SQLEnableConstraints = @"SELECT 
+            const string SQLEnableConstraints = @"SELECT 
 	            'ALTER TABLE ' + [t].[name] + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([c].[name])
                 FROM
                     sys.tables AS t
@@ -48,9 +43,9 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 SELECT 
 	            'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME([schema_id])) + N'.' + QUOTENAME(OBJECT_NAME([parent_object_id])) + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([name])
                 FROM 
-                    sys.[foreign_keys] 
+                    sys.foreign_keys 
                 WHERE 
-                    [is_disabled] = 1 OR [is_not_trusted] = 1";
+                    is_disabled = 1 OR is_not_trusted = 1";
 
             var finished = false;
             var incompliantDataDeletion = ConfigurationManager.AppSettings["IncompliantDataDeletion"].ToLowerInvariant();
@@ -79,24 +74,22 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     {
                         //delete data which prevents constraints from being enabled
                         DisableAllDestinationConstraints();
-                        const string sql = @"select
-                            fk.name as fk_constraint_name,
-                            fk_cols.constraint_column_id as fk_constraint_column_id,
-                            QUOTENAME(schema_name(tab.schema_id)) + '.' + QUOTENAME(tab.name) as fk_foreign_table,
-                            QUOTENAME(col.name) as fk_column,
-                            QUOTENAME(schema_name(pk_tab.schema_id)) + '.' + QUOTENAME(pk_tab.name) as primary_table,
-                            QUOTENAME(pk_col.name) as primary_column
-                            from sys.tables tab
-                            inner join sys.columns col on col.object_id = tab.object_id
-                            inner join sys.foreign_key_columns fk_cols
-                            on fk_cols.parent_object_id = tab.object_id
-                            and fk_cols.parent_column_id = col.column_id
-                            inner join sys.foreign_keys fk on fk.object_id = fk_cols.constraint_object_id
-                            inner join sys.tables pk_tab on pk_tab.object_id = fk_cols.referenced_object_id
-                            inner join sys.columns pk_col
-                            on pk_col.column_id = fk_cols.referenced_column_id
-                            and pk_col.object_id = fk_cols.referenced_object_id
-                            order by 5,3,1,2";
+                        const string sql = @"SELECT
+                            fk.name AS fk_constraint_name,
+                            fk_cols.constraint_column_id AS fk_constraint_column_id,
+                            QUOTENAME(schema_name(tab.schema_id)) + '.' + QUOTENAME(tab.name) AS fk_foreign_table,
+                            QUOTENAME(col.name) AS fk_column,
+                            QUOTENAME(schema_name(pk_tab.schema_id)) + '.' + QUOTENAME(pk_tab.name) AS primary_table,
+                            QUOTENAME(pk_col.name) AS primary_column
+                            FROM sys.tables tab
+                            INNER JOIN sys.columns col ON col.object_id = tab.object_id
+                            INNER JOIN sys.foreign_key_columns fk_cols
+                                ON fk_cols.parent_object_id = tab.object_id AND fk_cols.parent_column_id = col.column_id
+                            INNER JOIN sys.foreign_keys fk ON fk.object_id = fk_cols.constraint_object_id
+                            INNER JOIN sys.tables pk_tab ON pk_tab.object_id = fk_cols.referenced_object_id
+                            INNER JOIN sys.columns pk_col
+                                ON pk_col.column_id = fk_cols.referenced_column_id AND pk_col.object_id = fk_cols.referenced_object_id
+                            ORDER BY 5,3,1,2";
 
                         using (SqlCommand command = DestinationConnection.SqlConnectionObject.CreateCommand())
                         {
@@ -171,16 +164,16 @@ namespace Sql2SqlCloner.Core.DataTransfer
         {
             using (SqlCommand command = connection.CreateCommand())
             {
-                command.CommandText = @"select sche.name schemaName, tab.name tableName, col.name colName,
-                    isnull(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0) is_computed
-                    from (sys.columns col
-                    inner join sys.tables tab on tab.object_id=col.object_id
-                    inner join sys.schemas sche on sche.schema_id=tab.schema_id)
-                    left join sys.computed_columns ccl on ccl.object_id=col.object_id and ccl.column_id=col.column_id
-                    where sche.name=@schema and tab.name=@table
-                    and ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0)=0 --exclude computed columns
-                    and ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'GeneratedAlwaysType'),0)=0 --exclude generated columns
-                    order by 1,2,col.column_id";
+                command.CommandText = @"SELECT sche.name AS schemaName, tab.name AS tableName, col.name AS colName,
+                    ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0) AS is_computed
+                    FROM (sys.columns col
+                    INNER JOIN sys.tables tab ON tab.object_id=col.object_id
+                    INNER JOIN sys.schemas sche ON sche.schema_id=tab.schema_id)
+                    LEFT JOIN sys.computed_columns ccl ON ccl.object_id=col.object_id AND ccl.column_id=col.column_id
+                    WHERE sche.name=@schema AND tab.name=@table
+                    AND ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0)=0 --exclude computed columns
+                    AND ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'GeneratedAlwaysType'),0)=0 --exclude generated columns
+                    ORDER BY sche.name,tab.name,col.column_id";
                 command.CommandTimeout = SqlTimeout;
                 command.CommandType = CommandType.Text;
                 var tablesplit = tableName.Split('.');
@@ -200,30 +193,33 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
         private string GetMasterHistoryTable(SqlConnection connection, string tableName)
         {
-            using (SqlCommand command = connection.CreateCommand())
+            if (dbSource.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version) && dbDestination.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
             {
-                command.CommandText = @"select QUOTENAME(sche.name) + '.' + QUOTENAME(tab.name) AS MasterHistoryTable
-                        from (sys.tables tab inner join sys.schemas sche on sche.schema_id=tab.schema_id)
-                        where history_table_id =
-                        (
-                            select object_id
-                            from (sys.tables tab inner join sys.schemas sche on sche.schema_id=tab.schema_id)
-                            where sche.name=@schema and tab.name=@table
-                        )";
-                command.CommandTimeout = SqlTimeout;
-                command.CommandType = CommandType.Text;
-                var tablesplit = tableName.Split('.');
-                command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
-                command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
-                using (var reader = command.ExecuteReader())
+                using (SqlCommand command = connection.CreateCommand())
                 {
-                    if (reader.Read())
+                    command.CommandText = @"SELECT QUOTENAME(sche.name) + '.' + QUOTENAME(tab.name) AS MasterHistoryTable
+                        FROM (sys.tables tab INNER JOIN sys.schemas sche ON sche.schema_id=tab.schema_id)
+                        WHERE history_table_id =
+                        (
+                            SELECT object_id
+                            FROM (sys.tables tab INNER JOIN sys.schemas sche ON sche.schema_id=tab.schema_id)
+                            WHERE sche.name=@schema AND tab.name=@table
+                        )";
+                    command.CommandTimeout = SqlTimeout;
+                    command.CommandType = CommandType.Text;
+                    var tablesplit = tableName.Split('.');
+                    command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
+                    command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
+                    using (var reader = command.ExecuteReader())
                     {
-                        return (string)reader["MasterHistoryTable"];
+                        if (reader.Read())
+                        {
+                            return (string)reader["MasterHistoryTable"];
+                        }
                     }
                 }
-                return null;
             }
+            return null;
         }
 
         public bool TransferData(string table, string query)
@@ -237,13 +233,14 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     {
                         batchSize = 5000;
                     }
-                    BulkCopy = new SqlBulkCopy(DestinationConnectionString, SqlBulkCopyOptions.KeepIdentity)
+                    BulkCopy = new SqlBulkCopy(destinationConnectionString, SqlBulkCopyOptions.KeepIdentity)
                     {
                         BatchSize = batchSize,
                         NotifyAfter = batchSize * 2,
                         BulkCopyTimeout = SqlTimeout
                     };
                 }
+
                 var masterhistorytable = GetMasterHistoryTable(DestinationConnection.SqlConnectionObject, table);
                 if (!string.IsNullOrEmpty(masterhistorytable))
                 {

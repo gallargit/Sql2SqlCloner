@@ -291,11 +291,16 @@ namespace Sql2SqlCloner
                         return;
                     }
                 }
+                if (resultdiag == DialogResult.Retry)
+                {
+                    RestartForm();
+                    return;
+                }
             }
             else
             {
                 {
-                    MessageBox.Show("No SQL objects found in source database to copy");
+                    MessageBox.Show("No SQL objects found in source database to copy from");
                     Environment.Exit(0);
                     return;
                 }
@@ -353,11 +358,7 @@ namespace Sql2SqlCloner
                     copyTableData.ShowDialog();
                     if (copyTableData.DialogResult == DialogResult.Retry)
                     {
-                        AbortBackgroundTask();
-                        strtskSource = strtskDestination = null;
-                        SetFormControls(true);
-                        ChooseConnections_Load(null, null);
-                        Visible = true;
+                        RestartForm();
                     }
                     else
                     {
@@ -402,6 +403,15 @@ namespace Sql2SqlCloner
         {
             Visible = false;
             AbortBackgroundTask();
+        }
+
+        private void RestartForm()
+        {
+            AbortBackgroundTask();
+            strtskSource = strtskDestination = null;
+            SetFormControls(true);
+            ChooseConnections_Load(null, null);
+            Visible = true;
         }
 
         private void AbortBackgroundTask()

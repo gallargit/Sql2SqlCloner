@@ -85,7 +85,7 @@ namespace Sql2SqlCloner
 
             //Doing this process with two threads improves performance
             //adding more threads does not improve results
-            var NUMTHREADS = 2;
+            const int NUMTHREADS = 2;
             var tasks = new List<Task>();
             for (int i = 0; i < NUMTHREADS; i++)
             {
@@ -498,24 +498,21 @@ namespace Sql2SqlCloner
                 DialogResult = DialogResult.Retry;
                 Close();
             }
+            else if (btnPause.Text == "Pause")
+            {
+                pause.Reset();
+                Timer1.Stop();
+                stopwatch1.Stop();
+                btnPause.Text = "Resume";
+                btnCopyMessages.Visible = true;
+            }
             else
             {
-                if (btnPause.Text == "Pause")
-                {
-                    pause.Reset();
-                    Timer1.Stop();
-                    stopwatch1.Stop();
-                    btnPause.Text = "Resume";
-                    btnCopyMessages.Visible = true;
-                }
-                else
-                {
-                    btnCopyMessages.Visible = false;
-                    Timer1.Start();
-                    stopwatch1.Start();
-                    btnPause.Text = "Pause";
-                    pause.Set();
-                }
+                btnCopyMessages.Visible = false;
+                Timer1.Start();
+                stopwatch1.Start();
+                btnPause.Text = "Pause";
+                pause.Set();
             }
         }
 

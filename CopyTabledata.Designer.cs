@@ -53,10 +53,9 @@
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnNext.Enabled = false;
-            this.btnNext.Location = new System.Drawing.Point(688, 340);
-            this.btnNext.Margin = new System.Windows.Forms.Padding(4);
+            this.btnNext.Location = new System.Drawing.Point(516, 276);
             this.btnNext.Name = "btnNext";
-            this.btnNext.Size = new System.Drawing.Size(100, 28);
+            this.btnNext.Size = new System.Drawing.Size(75, 23);
             this.btnNext.TabIndex = 3;
             this.btnNext.Text = "Copy";
             this.btnNext.UseVisualStyleBackColor = true;
@@ -66,20 +65,18 @@
             // 
             this.progressBar1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.progressBar1.Location = new System.Drawing.Point(16, 298);
-            this.progressBar1.Margin = new System.Windows.Forms.Padding(4);
+            this.progressBar1.Location = new System.Drawing.Point(12, 242);
             this.progressBar1.Name = "progressBar1";
-            this.progressBar1.Size = new System.Drawing.Size(880, 28);
+            this.progressBar1.Size = new System.Drawing.Size(660, 23);
             this.progressBar1.TabIndex = 6;
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(14, 14);
-            this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.label1.MaximumSize = new System.Drawing.Size(772, 0);
+            this.label1.Location = new System.Drawing.Point(10, 11);
+            this.label1.MaximumSize = new System.Drawing.Size(579, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(85, 16);
+            this.label1.Size = new System.Drawing.Size(70, 13);
             this.label1.TabIndex = 7;
             this.label1.Text = "Please wait...";
             // 
@@ -87,10 +84,9 @@
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.Enabled = false;
-            this.btnCancel.Location = new System.Drawing.Point(797, 340);
-            this.btnCancel.Margin = new System.Windows.Forms.Padding(4);
+            this.btnCancel.Location = new System.Drawing.Point(598, 276);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(99, 28);
+            this.btnCancel.Size = new System.Drawing.Size(74, 23);
             this.btnCancel.TabIndex = 5;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
@@ -100,10 +96,9 @@
             // 
             this.label2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(27, 345);
-            this.label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label2.Location = new System.Drawing.Point(12, 280);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(26, 16);
+            this.label2.Size = new System.Drawing.Size(21, 13);
             this.label2.TabIndex = 9;
             this.label2.Text = "0%";
             // 
@@ -126,14 +121,13 @@
             this.Result,
             this.HasRelationships,
             this.TOP});
-            this.dataGridView1.Location = new System.Drawing.Point(16, 44);
-            this.dataGridView1.Margin = new System.Windows.Forms.Padding(4);
+            this.dataGridView1.Location = new System.Drawing.Point(12, 36);
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersWidth = 25;
             this.dataGridView1.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
             this.dataGridView1.ShowEditingIcon = false;
-            this.dataGridView1.Size = new System.Drawing.Size(880, 239);
+            this.dataGridView1.Size = new System.Drawing.Size(660, 194);
             this.dataGridView1.TabIndex = 0;
             this.dataGridView1.DataError += new System.Windows.Forms.DataGridViewDataErrorEventHandler(this.dataGridView1_DataError);
             // 
@@ -194,10 +188,9 @@
             // 
             this.btnCopyMessages.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCopyMessages.Enabled = false;
-            this.btnCopyMessages.Location = new System.Drawing.Point(461, 340);
-            this.btnCopyMessages.Margin = new System.Windows.Forms.Padding(4);
+            this.btnCopyMessages.Location = new System.Drawing.Point(346, 276);
             this.btnCopyMessages.Name = "btnCopyMessages";
-            this.btnCopyMessages.Size = new System.Drawing.Size(127, 28);
+            this.btnCopyMessages.Size = new System.Drawing.Size(95, 23);
             this.btnCopyMessages.TabIndex = 1;
             this.btnCopyMessages.Text = "Copy messages";
             this.btnCopyMessages.UseVisualStyleBackColor = true;
@@ -208,10 +201,9 @@
             // 
             this.btnPause.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnPause.Enabled = false;
-            this.btnPause.Location = new System.Drawing.Point(595, 340);
-            this.btnPause.Margin = new System.Windows.Forms.Padding(4);
+            this.btnPause.Location = new System.Drawing.Point(446, 276);
             this.btnPause.Name = "btnPause";
-            this.btnPause.Size = new System.Drawing.Size(85, 28);
+            this.btnPause.Size = new System.Drawing.Size(64, 23);
             this.btnPause.TabIndex = 2;
             this.btnPause.Text = "Pause";
             this.btnPause.UseVisualStyleBackColor = true;
@@ -222,10 +214,9 @@
             this.autoScrollGrid.AutoSize = true;
             this.autoScrollGrid.Checked = true;
             this.autoScrollGrid.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.autoScrollGrid.Location = new System.Drawing.Point(796, 16);
-            this.autoScrollGrid.Margin = new System.Windows.Forms.Padding(4);
+            this.autoScrollGrid.Location = new System.Drawing.Point(597, 13);
             this.autoScrollGrid.Name = "autoScrollGrid";
-            this.autoScrollGrid.Size = new System.Drawing.Size(91, 20);
+            this.autoScrollGrid.Size = new System.Drawing.Size(75, 17);
             this.autoScrollGrid.TabIndex = 10;
             this.autoScrollGrid.Text = "Auto scroll";
             this.autoScrollGrid.UseVisualStyleBackColor = true;
@@ -233,9 +224,9 @@
             // 
             // CopyTabledata
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(912, 383);
+            this.ClientSize = new System.Drawing.Size(684, 311);
             this.Controls.Add(this.autoScrollGrid);
             this.Controls.Add(this.btnPause);
             this.Controls.Add(this.btnCopyMessages);
@@ -245,7 +236,6 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.progressBar1);
             this.Controls.Add(this.btnNext);
-            this.Margin = new System.Windows.Forms.Padding(4);
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "CopyTabledata";

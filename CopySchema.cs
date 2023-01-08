@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Management.Smo;
+using Sql2SqlCloner.Core;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
@@ -189,7 +190,7 @@ namespace Sql2SqlCloner
 
             //system-versioned history tables will be created automatically, remove them
             foreach (Table systemhistorytable in currList.Select(o => o.Object).OfType<Table>().Where(table =>
-                SchemaTransfer.GetTableProperty(table, "IsSystemVersioned")).ToList())
+                table.GetTableProperty("IsSystemVersioned")).ToList())
             {
                 currList.Remove(currList.First(t => (t.Object is Table table) && table.ID == systemhistorytable.HistoryTableID));
             }
@@ -235,7 +236,7 @@ namespace Sql2SqlCloner
                             item.Status.Tag = "OK";
                             if (item.Object is DatabaseDdlTrigger)
                             {
-                                SchemaTransfer.RunInDestination($"SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' from sys.triggers WHERE name='{item.Name}'");
+                                SchemaTransfer.RunInDestination($"SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' FROM sys.triggers WHERE name='{item.Name}'");
                             }
                         }
                         catch (Exception ex)
@@ -249,7 +250,7 @@ namespace Sql2SqlCloner
                                 else
                                 if ((item.Type == "Table" || item.Type == "View") && previousListCount != currList.Count)
                                 {
-                                    lstDelete.Add($"IF OBJECT_ID('{item.Object}','{item.Type.Substring(0, 1).Replace("T", "U")}') is not null DROP {item.Type.ToUpperInvariant()} {item.Object}");
+                                    lstDelete.Add($"IF OBJECT_ID('{item.Object}','{item.Type.Substring(0, 1).Replace("T", "U")}') IS NOT NULL DROP {item.Type.ToUpperInvariant()} {item.Object}");
                                     //if this table/view is to be deleted, set its triggers as deleted
                                     foreach (var subitem in CopyList.Where(x => x.Parent == item))
                                     {
@@ -542,6 +543,11 @@ namespace Sql2SqlCloner
                 }
                 else
                 {
+                    if (!closeIfSuccess && errorCount == 0)
+                    {
+                        btnPause.Text = "Start over";
+                        btnPause.Enabled = true;
+                    }
                     MessageBox.Show($"Finished. {label1.Text}");
                 }
             }
@@ -712,7 +718,12 @@ namespace Sql2SqlCloner
 
         private void btnPause_Click(object sender, EventArgs e)
         {
-            if (btnPause.Text == "Pause")
+            if (btnPause.Text == "Start over")
+            {
+                DialogResult = DialogResult.Retry;
+                Close();
+            }
+            else if (btnPause.Text == "Pause")
             {
                 pause.Reset();
                 Timer1.Stop();

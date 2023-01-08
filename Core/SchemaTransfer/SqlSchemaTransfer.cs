@@ -16,12 +16,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 {
     public class SqlSchemaTransfer : SqlTransfer
     {
-        private const int SQL_2008_Version = 655;
-        private const int SQL_2012_Version = 706;
-        private const int SQL_2016_Version = 852;
         private const int TOKEN_DOT = 46;
-        private readonly string sourceConnectionString;
-        private readonly string destinationConnectionString;
         private Server sourceServer;
         private Server destinationServer;
         private Database sourceDatabase;
@@ -92,24 +87,22 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public SqlSchemaTransfer(string src, string dst, CancellationToken ct) : base(null)
+        public SqlSchemaTransfer(string src, string dst, CancellationToken ct) : base(src, dst, null)
         {
             cancelToken = ct;
-            sourceConnectionString = src;
-            destinationConnectionString = dst;
             RefreshAll();
 
             SameDatabase = SameServer() &&
-                string.Equals(sourceConnection.DatabaseName, destinationConnection.DatabaseName, StringComparison.InvariantCultureIgnoreCase);
+                string.Equals(SourceConnection.DatabaseName, DestinationConnection.DatabaseName, StringComparison.InvariantCultureIgnoreCase);
 
             transfer = new Transfer(sourceDatabase)
             {
                 CopySchema = true,
                 CopyData = false,
-                DestinationServer = destinationConnection.ServerInstance,
-                DestinationDatabase = destinationConnection.DatabaseName,
-                DestinationLogin = destinationConnection.Login,
-                DestinationPassword = destinationConnection.Password,
+                DestinationServer = DestinationConnection.ServerInstance,
+                DestinationDatabase = DestinationConnection.DatabaseName,
+                DestinationLogin = DestinationConnection.Login,
+                DestinationPassword = DestinationConnection.Password,
                 DropDestinationObjectsFirst = false,
                 DestinationLoginSecure = destinationConnectionString.IndexOf("integrated security=true", StringComparison.InvariantCultureIgnoreCase) >= 0,
                 Options = new ScriptingOptions
@@ -227,7 +220,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 bool copyAzureUserToNonAzureDB = (obj is User) &&
                     sourceServer.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase && destinationServer.DatabaseEngineType != DatabaseEngineType.SqlAzureDatabase;
                 //system-versioned tables should have their PK created right away
-                transfer.Options.DriPrimaryKey = obj is Table table && (GetTableProperty(table, "IsSystemVersioned") || GetTableProperty(table, "IsMemoryOptimized"));
+                transfer.Options.DriPrimaryKey = obj is Table table && (table.GetTableProperty("IsSystemVersioned") || table.GetTableProperty("IsMemoryOptimized"));
                 transfer.Options.IncludeIfNotExists = obj is Schema;
 
                 var scripts = transfer.ScriptTransfer();
@@ -725,7 +718,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 if (firstRun)
                 {
-                    RunInDestination("SELECT 'DROP SECURITY POLICY ' + QUOTENAME(s.name) + '.' + QUOTENAME(p.name) FROM sys.security_policies p INNER JOIN sys.schemas s ON p.schema_id= s.schema_id");
+                    RunInDestination("SELECT 'DROP SECURITY POLICY ' + QUOTENAME(s.name) + '.' + QUOTENAME(p.name) FROM sys.security_policies p INNER JOIN sys.schemas s ON p.schema_id=s.schema_id");
                     firstRun = false;
                 }
 
@@ -772,49 +765,34 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 FROM sys.schemas s INNER JOIN sys.sysusers u
                                     ON u.uid = s.principal_id
                                 WHERE s.name NOT IN('public','dbo','guest','INFORMATION_SCHEMA','sys')
-                                    and (u.uid & 16384 = 0)");
+                                    AND (u.uid & 16384 = 0)");
         }
 
         //not needed by now
         public void CopyPermissions()
         {
             CopyToDestination(@"SELECT 'GRANT ' + permission_name COLLATE DATABASE_DEFAULT + ' ON ' +
-                isnull(schema_name(o.uid)+'.','') + OBJECT_NAME(major_id) +
-                ' TO ' + QUOTENAME(USER_NAME(grantee_principal_id)) as grantStatement
+                ISNULL(schema_name(o.uid)+'.','') + OBJECT_NAME(major_id) +
+                ' TO ' + QUOTENAME(USER_NAME(grantee_principal_id))
                 FROM sys.database_permissions dp
                 LEFT OUTER JOIN sysobjects o ON o.id = dp.major_id
-                WHERE OBJECT_NAME(major_id) is not null");
+                WHERE OBJECT_NAME(major_id) IS NOT NULL");
         }
 
         public void CopyRolePermissions()
         {
-            CopyToDestination(@"SELECT 'EXEC sp_addrolemember N'''+ DP1.name + ''', N''' + isnull (DP2.name, 'No members') + ''''
+            CopyToDestination(@"SELECT 'EXEC sp_addrolemember N'''+ DP1.name + ''', N''' + ISNULL(DP2.name, 'No members') + ''''
                 FROM sys.database_role_members AS DRM
                 RIGHT OUTER JOIN sys.database_principals AS DP1
-                   ON DRM.role_principal_id = DP1.principal_id
+                   ON DRM.role_principal_id=DP1.principal_id
                 LEFT OUTER JOIN sys.database_principals AS DP2
-                   ON DRM.member_principal_id = DP2.principal_id
+                   ON DRM.member_principal_id=DP2.principal_id
                 WHERE DP1.type='R' AND DP1.is_fixed_role=0 AND DP2.is_fixed_role=0");
         }
 
         private List<SqlSchemaObject> GetSqlObjects(ServerConnection connection, Database db)
         {
             var items = new List<SqlSchemaObject>();
-            var isRunningMinimumSQL2008 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2008)
-            {
-                isRunningMinimumSQL2008 = db.Version >= SQL_2008_Version;
-            }
-            var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2012)
-            {
-                isRunningMinimumSQL2012 = db.Version >= SQL_2012_Version;
-            }
-            var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2016)
-            {
-                isRunningMinimumSQL2016 = db.Version >= SQL_2016_Version;
-            }
 
             foreach (SqlAssembly item in db.Assemblies)
             {
@@ -828,7 +806,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
 
-            if (isRunningMinimumSQL2008)
+            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2008_Version))
             {
                 foreach (FullTextStopList item in db.FullTextStopLists)
                 {
@@ -880,7 +858,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
-            if (isRunningMinimumSQL2008)
+            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2008_Version))
             {
                 foreach (UserDefinedTableType item in db.UserDefinedTableTypes)
                 {
@@ -923,7 +901,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
-            if (isRunningMinimumSQL2012)
+            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
             {
                 foreach (Sequence item in db.Sequences)
                 {
@@ -945,17 +923,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             var dicTables = new Dictionary<string, long>(StringComparer.InvariantCultureIgnoreCase);
             using (var command = connection.SqlConnectionObject.CreateCommand())
             {
-                command.CommandText = @"SELECT (SCHEMA_NAME(sOBJ.schema_id)) + '.' + (sOBJ.name) AS TableName ,SUM(sPTN.Rows) AS RowCountNum
-                    FROM
-                    sys.objects AS sOBJ
-                    INNER JOIN sys.partitions AS sPTN
-                    ON sOBJ.object_id = sPTN.object_id
-                    WHERE
-                    sOBJ.type = 'U'
-                    AND sOBJ.is_ms_shipped = 0
-                    AND index_id < 2
-                    GROUP BY
-                    sOBJ.schema_id, sOBJ.name
+                command.CommandText = @"SELECT (SCHEMA_NAME(sOBJ.schema_id)) + '.' + (sOBJ.name) AS TableName,SUM(sPTN.Rows) AS RowCountNum
+                    FROM sys.objects AS sOBJ INNER JOIN sys.partitions AS sPTN
+                        ON sOBJ.object_id = sPTN.object_id
+                    WHERE sOBJ.type = 'U'
+                        AND sOBJ.is_ms_shipped = 0
+                        AND index_id < 2
+                    GROUP BY sOBJ.schema_id, sOBJ.name
                     ORDER BY 2 DESC";
                 command.CommandType = CommandType.Text;
                 using (var reader = command.ExecuteReader())
@@ -1024,7 +998,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
 
-            if (isRunningMinimumSQL2016)
+            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
             {
                 foreach (SecurityPolicy item in db.SecurityPolicies)
                 {
@@ -1124,33 +1098,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public bool GetTableProperty(Table t, string propertyName)
-        {
-            Database db = t.Parent;
-            var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2012)
-            {
-                isRunningMinimumSQL2012 = db.Version >= SQL_2012_Version;
-            }
-            var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-            if (!isRunningMinimumSQL2016)
-            {
-                isRunningMinimumSQL2016 = db.Version >= SQL_2016_Version;
-            }
-            if (propertyName == nameof(t.ChangeTrackingEnabled) && !isRunningMinimumSQL2012)
-            {
-                return false;
-            }
-            else if ((propertyName == nameof(t.IsMemoryOptimized) || propertyName == nameof(t.IsSystemVersioned))
-                && !isRunningMinimumSQL2016)
-            {
-                return false;
-            }
-            else
-            {
-                return (bool)t.GetType().GetProperty(propertyName).GetValue(t);
-            }
-        }
         public void ApplyIndexes(NamedSmoObject obj, bool CopyFullText)
         {
             var destinationTable = GetDestinationTableOrViewByName(obj);
@@ -1191,12 +1138,12 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     continue;
                 }
                 //primary keys for system-versioned tables are already created
-                if (destinationTable is Table table && GetTableProperty(table, "IsSystemVersioned") && !GetTableProperty(table, "IsMemoryOptimized")
+                if (destinationTable is Table table && table.GetTableProperty("IsSystemVersioned") && !table.GetTableProperty("IsMemoryOptimized")
                     && (srcindex.IndexKeyType == IndexKeyType.DriPrimaryKey))
                 {
                     continue;
                 }
-                if (destinationTable is Table table2 && GetTableProperty(table2, "IsMemoryOptimized"))
+                if (destinationTable is Table table2 && table2.GetTableProperty("IsMemoryOptimized"))
                 {
                     continue;
                 }
@@ -1270,7 +1217,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     throw;
                 }
             }
-            if (obj is Table sTab && GetTableProperty(sTab, "ChangeTrackingEnabled"))
+            if (obj is Table sTab && sTab.GetTableProperty("ChangeTrackingEnabled"))
             {
                 /*
                 this does not work, direct SQL is used instead
@@ -1483,11 +1430,11 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                         return;
                                     }
 
-                                    if (GetTableProperty(table, "IsSystemVersioned"))
+                                    if (table.GetTableProperty("IsSystemVersioned"))
                                     {
                                         table.IsSystemVersioned = false;
                                     }
-                                    if (GetTableProperty(table, "IsMemoryOptimized"))
+                                    if (table.GetTableProperty("IsMemoryOptimized"))
                                     {
                                         table.IsMemoryOptimized = false;
                                     }
@@ -1532,7 +1479,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 }
                                 if (lstDelete != null)
                                 {
-                                    processed = remaining = 0;//do not keep on retrying if just deleting specific objects
+                                    processed = remaining = 0; //do not keep on retrying if just deleting specific objects
                                 }
                                 else
                                 {
@@ -1583,12 +1530,12 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
         public string SourceCxInfo()
         {
-            return FormatInstance(sourceConnection.ServerInstance) + "." + sourceConnection.DatabaseName;
+            return FormatInstance(SourceConnection.ServerInstance) + "." + SourceConnection.DatabaseName;
         }
 
         public string DestinationCxInfo()
         {
-            return FormatInstance(destinationConnection.ServerInstance) + "." + destinationConnection.DatabaseName;
+            return FormatInstance(DestinationConnection.ServerInstance) + "." + DestinationConnection.DatabaseName;
         }
     }
 }
