@@ -65,7 +65,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     {
                         incompliantDataDeletion = MessageBox.Show(
                         "Could not enable constraints. Delete incompliant data?" + Environment.NewLine + Environment.NewLine +
-                        "Last error was: " + ex.Message, "Error",
+                        $"Last error was: {ex.Message}", "Error",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes
                         ? "true"
                         : "false";
@@ -147,6 +147,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                         try
                         {
                             RunInDestination(SQLEnableConstraints);
+                            DisableDisabledObjects();
                         }
                         catch { }
                         throw new Exception("Could not enable constraints");

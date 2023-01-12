@@ -175,7 +175,7 @@ namespace Sql2SqlCloner.Core
         //but that were enabled while copying
         public void DisableDisabledObjects()
         {
-            //disable everything that's disabled
+            //disable everything that was disabled
             CopyToDestination(@"SELECT 'ALTER TABLE ' + QUOTENAME(schema_name(tab.schema_id)) + '.' + QUOTENAME(tab.name) + ' NOCHECK CONSTRAINT ' + QUOTENAME(i.name)
                     FROM sys.check_constraints i INNER JOIN sys.objects tab ON i.parent_object_id=tab.object_id
                     WHERE is_disabled=1 OR is_not_trusted=1
@@ -190,6 +190,7 @@ namespace Sql2SqlCloner.Core
                 UNION
                 SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE'
                     FROM sys.triggers WHERE parent_class_desc='DATABASE' AND is_disabled=1
+                UNION
                 SELECT 'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' + QUOTENAME(Object_Name(sys.foreign_keys.parent_object_id)) + ' NOCHECK CONSTRAINT ' + QUOTENAME(sys.foreign_keys.name)
                     FROM sys.foreign_keys INNER JOIN sys.tables ON sys.foreign_keys.parent_object_id=sys.tables.object_id WHERE is_disabled=1 OR is_not_trusted=1
             ");
@@ -200,6 +201,11 @@ namespace Sql2SqlCloner.Core
                 UNION
                     SELECT 'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' + QUOTENAME(Object_Name(sys.foreign_keys.parent_object_id)) + ' CHECK CONSTRAINT ' + QUOTENAME(sys.foreign_keys.name)
                     FROM sys.foreign_keys INNER JOIN sys.tables ON sys.foreign_keys.parent_object_id=sys.tables.object_id WHERE is_disabled=0 OR is_not_trusted=1
+                UNION
+                    SELECT 'ENABLE TRIGGER ' + QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' +  QUOTENAME(sys.triggers.name) + ' ON ' +
+                    QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' + QUOTENAME(sys.tables.name)
+                    FROM sys.triggers INNER JOIN sys.tables ON sys.triggers.parent_id=sys.tables.object_id
+                    WHERE is_disabled=0
             ");
         }
 

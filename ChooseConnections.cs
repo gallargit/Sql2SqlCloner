@@ -71,7 +71,7 @@ namespace Sql2SqlCloner
                 //"Trust Server Certificate" is not supported by Connection Dialog
                 if (builder.ContainsKey("Trust Server Certificate"))
                 {
-                    trustServerCertificate = ";Trust Server Certificate=" + builder["Trust Server Certificate"];
+                    trustServerCertificate = $";Trust Server Certificate={builder["Trust Server Certificate"]}";
                     builder.Remove("Trust Server Certificate");
                 }
                 tempconnectionString = builder.ConnectionString;

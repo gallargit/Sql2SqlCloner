@@ -211,7 +211,7 @@ namespace Sql2SqlCloner
             backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
             backgroundWorker1.WorkerSupportsCancellation = true;
             backgroundWorker1.WorkerReportsProgress = true;
-            label1.Text = "Copying data in progress from: '" + SchemaTransfer.SourceCxInfo() + "' to: '" + SchemaTransfer.DestinationCxInfo() + "'";
+            label1.Text = $"Copying data in progress from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
             progressBar1.Value = 0;
             backgroundWorker1.RunWorkerAsync();
         }
@@ -241,7 +241,10 @@ namespace Sql2SqlCloner
                 {
                     var tableName = item.Cells["Table"].Value.ToString();
                     currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()}.{tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}'";
-                    DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
+                    if (item.Cells["TOP"].Value.ToString() != "0")
+                    {
+                        DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
+                    }
                     //enable table constraints for standalone tables to avoid a single fat transaction at the end
                     if (string.Equals(item.Cells["HasRelationships"].Value.ToString(), "false", StringComparison.InvariantCultureIgnoreCase))
                     {
@@ -330,7 +333,7 @@ namespace Sql2SqlCloner
                     //prevent out of range exception when counting processed records
                     try
                     {
-                        totalRecs = $" {CopyList.Select(t => t.RowCount).Sum()} records copied";
+                        totalRecs = $" {CopyList.Select(t => t.RowCount).Sum()} records copied from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
                     }
                     catch { }
                 }

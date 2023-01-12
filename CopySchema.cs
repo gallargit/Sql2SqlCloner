@@ -136,7 +136,7 @@ namespace Sql2SqlCloner
                 RefreshDataGrid();
             }
             backgroundWorker1.ReportProgress(0);
-            currentlyCopying = "Copying schema from: '" + SchemaTransfer.SourceCxInfo() + "' to: '" + SchemaTransfer.DestinationCxInfo() + "'";
+            currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
             bool overrideCollation = false, useSourceCollation = false;
             SchemaTransfer.NoCollation = false;
             switch (Properties.Settings.Default.CopyCollation)
@@ -500,7 +500,7 @@ namespace Sql2SqlCloner
                 label1.Text = "Operation completed";
                 if (errorCount == 0)
                 {
-                    label1.Text += " successfully";
+                    label1.Text += $" successfully. Schema copied from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
                 }
                 else
                 {
@@ -519,9 +519,12 @@ namespace Sql2SqlCloner
                 {
                     if (CopyList.All(t => string.IsNullOrEmpty(t.Error)) || !Properties.Settings.Default.StopIfErrors)
                     {
-                        //no errors
-                        DialogResult = DialogResult.OK;
-                        Close();
+                        //no errors, keep on copying table data if any tables exist
+                        if (CopyList.OfType<SqlSchemaTable>().Any())
+                        {
+                            DialogResult = DialogResult.OK;
+                            Close();
+                        }
                     }
                     else
                     {
