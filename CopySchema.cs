@@ -109,6 +109,7 @@ namespace Sql2SqlCloner
         {
             if (Properties.Settings.Default.ClearDestinationDatabase)
             {
+                btnPauseEnabled = false;
                 var CopyListBack = CopyList.ToList();
                 CopyList.Clear();
                 CopyList.Add(new SqlSchemaObject
@@ -121,7 +122,7 @@ namespace Sql2SqlCloner
 
                 RefreshDataGrid();
 
-                currentlyCopying = "Clearing destination database...";
+                currentlyCopying = $"Clearing destination database {SchemaTransfer.DestinationCxInfo()}...";
                 backgroundWorker1.ReportProgress(0);
                 try
                 {
@@ -134,6 +135,7 @@ namespace Sql2SqlCloner
                 CopyList.Clear();
                 CopyList.AddRange(CopyListBack);
                 RefreshDataGrid();
+                btnPauseEnabled = true;
             }
             backgroundWorker1.ReportProgress(0);
             currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
@@ -161,7 +163,6 @@ namespace Sql2SqlCloner
                     useSourceCollation = false;
                     break;
             }
-            SchemaTransfer.IncludeExtendedProperties = Properties.Settings.Default.CopyExtendedProperties;
             SchemaTransfer.IncludePermissions = Properties.Settings.Default.CopyPermissions;
             SchemaTransfer.IgnoreFileGroup = Properties.Settings.Default.IgnoreFileGroup;
             double max = CopyList.Count;
@@ -422,7 +423,7 @@ namespace Sql2SqlCloner
                 currentlyCopying = "Processing permissions...";
                 try
                 {
-                    //not needed transfer.CopyPermissions();
+                    //not needed SchemaTransfer.CopyPermissions();
                     SchemaTransfer.CopyRolePermissions();
                     backgroundWorker1.ReportProgress((int)((current += CopyList.Count / 6.0) / max * 100.0));
                 }

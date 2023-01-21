@@ -129,7 +129,7 @@ namespace Sql2SqlCloner
                 {
                     EnablePreload = false;
                     strtskSource = strtskDestination = destinationConnection;
-                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, cancelToken), cancelToken);
+                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, cancelToken), cancelToken);
                 }
             }
         }
@@ -229,7 +229,7 @@ namespace Sql2SqlCloner
                 {
                     AbortBackgroundTask();
                     cancelToken = new CancellationToken();
-                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, cancelToken);
+                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, cancelToken);
                 }
                 strtskSource = strtskDestination = null;
                 tskPreload = null;

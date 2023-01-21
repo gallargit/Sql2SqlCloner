@@ -4,6 +4,7 @@ using Microsoft.SqlServer.Management.Common;
 using Microsoft.SqlServer.Management.Smo;
 using Microsoft.SqlServer.Management.SqlParser.Parser;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -31,17 +32,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         public List<SqlSchemaObject> DestinationObjects { get; private set; }
         public List<SqlSchemaObject> RecreateObjects { get; } = new List<SqlSchemaObject>();
 
-        public bool IncludeExtendedProperties
-        {
-            get
-            {
-                return transfer.Options.ExtendedProperties;
-            }
-            set
-            {
-                transfer.Options.ExtendedProperties = value;
-            }
-        }
         public bool IncludePermissions
         {
             get
@@ -87,10 +77,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
         }
 
-        public SqlSchemaTransfer(string src, string dst, CancellationToken ct) : base(src, dst, null)
+        public SqlSchemaTransfer(string src, string dst, bool skipPreload, CancellationToken ct) : base(src, dst, null)
         {
             cancelToken = ct;
-            RefreshAll();
+            RefreshAll(skipPreload);
 
             SameDatabase = SameServer() &&
                 string.Equals(SourceConnection.DatabaseName, DestinationConnection.DatabaseName, StringComparison.InvariantCultureIgnoreCase);
@@ -107,6 +97,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 DestinationLoginSecure = destinationConnectionString.IndexOf("integrated security=true", StringComparison.InvariantCultureIgnoreCase) >= 0,
                 Options = new ScriptingOptions
                 {
+                    AnsiPadding = true,
+                    AnsiFile = true,
                     Bindings = true,
                     ContinueScriptingOnError = true,
                     Default = true,
@@ -681,7 +673,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
             //extract all extended properties, SMO does not extract all of them by default (in azure environments they are not extracted at all)
             //therefore some will be duplicated
-            foreach (var obj in lst.ToList())
+            foreach (var obj in lst.Where(o => o is Table || o is View || o is StoredProcedure || o is UserDefinedFunction).ToList())
             {
                 if (obj is Table currentTable)
                 {
@@ -763,13 +755,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     }
                 }
             }
-
             //Clustered indexes properties cannot be obtained via SMO, do a direct copy instead
-            CopyToDestination(@"SELECT 'EXEC sys.sp_addextendedproperty N''MS_Description'', N''' + CONVERT(VARCHAR(2000), p.[value]) + ''', ''SCHEMA'', N''' +
-                PARSENAME(SCHEMA_NAME(t.schema_id),1) + ''', ''TABLE'', N''' + t.name + ''', ''INDEX'', N''' + i.[name]+ ''''
-                FROM sys.indexes i INNER JOIN sys.extended_properties p ON p.major_id=i.object_id AND p.minor_id=i.index_id
-                INNER JOIN sys.tables t ON t.object_id = i.object_id
-                WHERE p.class=7 AND (i.type=1 OR is_primary_key=1)");
+            AddClusteredIndexesDescriptions(true, true);
         }
 
         public void RemoveSchemaBindingFromDestination()
@@ -824,6 +811,28 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         currentErrors++;
                     }
                 }
+            }
+            //add description to views' clustered indexes
+            AddClusteredIndexesDescriptions(false, true);
+        }
+
+        private void AddClusteredIndexesDescriptions(bool tables, bool views)
+        {
+            if (tables)
+            {
+                CopyToDestination(@"SELECT 'EXEC sys.sp_addextendedproperty N''MS_Description'', N''' + CONVERT(VARCHAR(2000), p.[value]) + ''', ''SCHEMA'', N''' +
+                    PARSENAME(SCHEMA_NAME(t.schema_id),1) + ''', ''TABLE'', N''' + t.name + ''', ''INDEX'', N''' + i.[name]+ ''''
+                    FROM sys.indexes i INNER JOIN sys.extended_properties p ON p.major_id=i.object_id AND p.minor_id=i.index_id
+                    INNER JOIN sys.tables t ON t.object_id = i.object_id
+                    WHERE p.class=7 AND (i.type=1 OR is_primary_key=1)");
+            }
+            if (views)
+            {
+                CopyToDestination(@"SELECT 'EXEC sys.sp_addextendedproperty N''MS_Description'', N''' + CONVERT(VARCHAR(2000), p.[value]) + ''', ''SCHEMA'', N''' +
+                    PARSENAME(SCHEMA_NAME(v.schema_id),1) + ''', ''VIEW'', N''' + v.name + ''', ''INDEX'', N''' + i.[name]+ ''''
+                    FROM sys.indexes i INNER JOIN sys.extended_properties p ON p.major_id=i.object_id AND p.minor_id=i.index_id
+                    INNER JOIN sys.views v ON v.object_id = i.object_id
+                    WHERE p.class=7");
             }
         }
 
@@ -880,6 +889,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
+                foreach (SearchPropertyList item in db.SearchPropertyLists)
+                {
+                    items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
+                }
             }
             if (cancelToken.IsCancellationRequested)
             {
@@ -911,6 +924,24 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
+            }
+            if (cancelToken.IsCancellationRequested)
+            {
+                return items;
+            }
+
+            foreach (Microsoft.SqlServer.Management.Smo.Rule item in db.Rules)
+            {
+                items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
+            }
+            if (cancelToken.IsCancellationRequested)
+            {
+                return items;
+            }
+
+            foreach (PlanGuide item in db.PlanGuides)
+            {
+                items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
             if (cancelToken.IsCancellationRequested)
             {
@@ -1219,16 +1250,17 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     Index index = new Index(destinationTable, srcindex.Name)
                     {
-                        IndexKeyType = srcindex.IndexKeyType,
-                        IsClustered = srcindex.IsClustered,
-                        IsUnique = srcindex.IsUnique,
                         CompactLargeObjects = srcindex.CompactLargeObjects,
-                        IgnoreDuplicateKeys = srcindex.IgnoreDuplicateKeys,
-                        IsFullTextKey = srcindex.IsFullTextKey,
-                        PadIndex = srcindex.PadIndex,
-                        FillFactor = srcindex.FillFactor,
                         DisallowPageLocks = srcindex.DisallowPageLocks,
                         DisallowRowLocks = srcindex.DisallowRowLocks,
+                        FillFactor = srcindex.FillFactor,
+                        IgnoreDuplicateKeys = srcindex.IgnoreDuplicateKeys,
+                        IndexKeyType = srcindex.IndexKeyType,
+                        IsClustered = srcindex.IsClustered,
+                        IsFullTextKey = srcindex.IsFullTextKey,
+                        IsUnique = srcindex.IsUnique,
+                        NoAutomaticRecomputation = srcindex.NoAutomaticRecomputation,
+                        PadIndex = srcindex.PadIndex,
                     };
 
                     //FilterDefinition property is not available for all SQL Server editions
@@ -1420,41 +1452,45 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             DestinationObjects = GetSqlObjects(DestinationConnection, destinationDatabase);
         }
 
-        public void RefreshAll()
+        public void RefreshAll(bool skipPreload)
         {
             RefreshSource();
             RefreshDestination();
 
-            var sameserver = SameServer();
-            var tskSource = Task.Run(() =>
+            if (!skipPreload)
             {
-                sourceDatabase.PrefetchObjects(typeof(Table), new ScriptingOptions());
-                if (!cancelToken.IsCancellationRequested)
+                var sameserver = SameServer();
+                var tskSource = Task.Run(() =>
                 {
-                    SourceObjects = GetSqlObjects(SourceConnection, sourceDatabase);
+                    sourceDatabase.PrefetchObjects(typeof(Table), new ScriptingOptions());
+                    if (!cancelToken.IsCancellationRequested)
+                    {
+                        SourceObjects = GetSqlObjects(SourceConnection, sourceDatabase);
+                    }
+                });
+                if (sameserver || (ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() != "true"))
+                {
+                    tskSource.Wait();
                 }
-            });
-            if (sameserver || (ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() != "true"))
-            {
+
+                var tskDestination = Task.Run(() =>
+                {
+                    if (!cancelToken.IsCancellationRequested)
+                    {
+                        DestinationObjects = GetSqlObjects(DestinationConnection, destinationDatabase);
+                    }
+                });
                 tskSource.Wait();
+                tskDestination.Wait();
             }
-
-            var tskDestination = Task.Run(() =>
-            {
-                if (!cancelToken.IsCancellationRequested)
-                {
-                    DestinationObjects = GetSqlObjects(DestinationConnection, destinationDatabase);
-                }
-            });
-
-            tskSource.Wait();
-            tskDestination.Wait();
         }
 
-        public void ClearDestinationDatabase(List<SqlSchemaObject> lstDelete = null, Action<NamedSmoObject> callback = null)
+        public void ClearDestinationDatabase(Action<NamedSmoObject> callback = null)
         {
+            var mainContext = Thread.CurrentContext;
+
             var lastError = "";
-            if (DestinationObjects.Count == 0 || lstDelete?.Count == 0)
+            if (DestinationObjects.Count == 0)
             {
                 return;
             }
@@ -1465,38 +1501,35 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             //destination server (property "transfer.Scripter" is always the source server, not the destination)
             //therefore instead of using the "this" object a new one is created and all of the drop operations
             //will be performed there
+            var transferDrop = new SqlSchemaTransfer(destinationConnectionString, destinationConnectionString, true, cancelToken);
+            transferDrop.transfer.Options.ScriptDrops = true;
+            transferDrop.transfer.Options.IncludeIfNotExists = true;
+            transferDrop.transfer.Options.ContinueScriptingOnError = true;
+            transferDrop.transfer.CopyAllObjects = false;
+            transferDrop.ResetTransfer();
             while (remaining > 0 && lastCount != remaining)
             {
-                var transferDrop = new SqlSchemaTransfer(destinationConnectionString, destinationConnectionString, cancelToken);
-                transferDrop.transfer.Options.ScriptDrops = true;
-                transferDrop.transfer.Options.IncludeIfNotExists = true;
-                transferDrop.transfer.Options.ContinueScriptingOnError = true;
-                transferDrop.transfer.CopyAllObjects = false;
-                transferDrop.ResetTransfer();
-                List<NamedSmoObject> destinations;
-                if (lstDelete != null)
-                {
-                    destinations = lstDelete.ConvertAll(o => o.Object);
-                }
-                else
-                {
-                    //get all objects to remove placing schemas at the end and database triggers at the beginning
-                    destinations = transferDrop.DestinationObjects.ConvertAll(o => o.Object).Where(p => !(p is Schema))
-                           .Union(transferDrop.DestinationObjects.ConvertAll(s => s.Object)
-                           .Where(t => t is Schema)).ToList();
-                }
+                var destinations = new BlockingCollection<NamedSmoObject>();
+                var retrylist = new List<NamedSmoObject>();
+                DestinationObjects.ConvertAll(o => o.Object).Where(p => !(p is Schema))
+                   .Union(DestinationObjects.ConvertAll(s => s.Object))
+                   .Where(nt => !(nt is Table) && !(nt is Trigger))
+                   .ToList()
+                   .ForEach(item => destinations.Add(item));
+
                 lastCount = destinations.Count;
                 if (remaining > 0)
                 {
                     try
                     {
-                        using (SqlCommand command = new SqlCommand())
+                        //get tables with FKs and schemas
+                        var producerTablesAndSchemas = Task.Run(() =>
                         {
-                            command.Connection = transferDrop.DestinationConnection.SqlConnectionObject;
-                            command.CommandTimeout = SqlTimeout;
-                            if (lstDelete == null)
+                            using (SqlCommand command = new SqlCommand())
                             {
-                                foreach (Table table in transferDrop.DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object).Cast<Table>())
+                                command.Connection = transferDrop.DestinationConnection.SqlConnectionObject;
+                                command.CommandTimeout = sqlTimeout;
+                                foreach (Table table in DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object).Cast<Table>())
                                 {
                                     if (cancelToken.IsCancellationRequested)
                                     {
@@ -1511,24 +1544,39 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                     {
                                         table.IsMemoryOptimized = false;
                                     }
+                                    var addFK = new List<NamedSmoObject>();
                                     foreach (ForeignKey fk in table.ForeignKeys)
                                     {
-                                        destinations.Insert(0, fk);
+                                        //add the FKs altogether at the end to prevent deadlocks
+                                        addFK.Add(fk);
                                     }
+                                    addFK.ForEach(fk => destinations.Add(fk));
+                                    destinations.Add(table);
                                 }
+                                //place schemas at the end
+                                DestinationObjects.ConvertAll(o => o.Object).Where(p => p is Schema)
+                                                .ToList()
+                                                .ForEach(item => destinations.Add(item));
                             }
+                            destinations.CompleteAdding();
+                        });
 
+                        //process objects
+                        using (SqlCommand command = new SqlCommand())
+                        {
+                            command.Connection = transferDrop.DestinationConnection.SqlConnectionObject;
+                            command.CommandTimeout = sqlTimeout;
                             var processed = destinations.Count;
-                            while (processed > 0)
+
+                            while (!destinations.IsAddingCompleted || processed > 0)
                             {
                                 processed = 0;
-                                foreach (NamedSmoObject obj in destinations.ToList())
+                                foreach (var obj in destinations.GetConsumingEnumerable())
                                 {
                                     if (cancelToken.IsCancellationRequested)
                                     {
                                         return;
                                     }
-
                                     try
                                     {
                                         transferDrop.transfer.ObjectList.Clear();
@@ -1537,9 +1585,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                         {
                                             command.CommandText = scriptRun;
                                             command.ExecuteNonQuery();
-                                            destinations.Remove(obj);
                                             processed++;
-                                            callback?.Invoke(obj);
+                                            mainContext.DoCallBack(() => callback?.Invoke(obj));
                                         }
                                     }
                                     catch (Exception ex)
@@ -1548,16 +1595,18 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                         {
                                             lastError = $". {ex.Message} Affected object: {obj.Name}";
                                         }
+                                        if (!retrylist.Contains(obj))
+                                        {
+                                            retrylist.Add(obj);
+                                        }
                                     }
                                 }
-                                if (lstDelete != null)
+                                if (retrylist.Count > 0 && destinations.IsAddingCompleted)
                                 {
-                                    processed = remaining = 0; //do not keep on retrying if just deleting specific objects
-                                }
-                                else
-                                {
-                                    transferDrop.RefreshDestinationObjects();
-                                    destinations = transferDrop.DestinationObjects.ConvertAll(o => o.Object);
+                                    destinations = new BlockingCollection<NamedSmoObject>();
+                                    retrylist.ForEach(r => destinations.Add(r));
+                                    retrylist.Clear();
+                                    destinations.CompleteAdding();
                                 }
                                 if (destinations.Count == 0)
                                 {
@@ -1565,12 +1614,16 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 }
                             }
                         }
+
+                        producerTablesAndSchemas.Wait();
+
+                        if (cancelToken.IsCancellationRequested)
+                        {
+                            return;
+                        }
                         try
                         {
-                            if (lstDelete == null)
-                            {
-                                transferDrop.destinationDatabase.RemoveFullTextCatalogs();
-                            }
+                            transferDrop.destinationDatabase.RemoveFullTextCatalogs();
                         }
                         catch { }
                     }
@@ -1578,15 +1631,12 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     {
                         throw;
                     }
-                    //refresh local object before exiting
+                    //refresh local objects before exiting
                     RefreshDestinationObjects();
-                    if (lstDelete == null)
-                    {
-                        remaining = DestinationObjects.Count;
-                    }
+                    remaining = DestinationObjects.Count;
                 }
             }
-            if (lstDelete == null && DestinationObjects.Count > 0)
+            if (DestinationObjects.Count > 0)
             {
                 throw new Exception($"Could not delete items{lastError}");
             }

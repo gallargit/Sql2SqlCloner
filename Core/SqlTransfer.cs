@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Management.Common;
 using Microsoft.SqlServer.Management.Smo;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
@@ -16,7 +17,7 @@ namespace Sql2SqlCloner.Core
         protected readonly Database dbDestination;
         protected readonly string sourceConnectionString;
         protected readonly string destinationConnectionString;
-        protected readonly int SqlTimeout;
+        protected readonly int sqlTimeout;
 
         public IList<string> LstPostExecutionExecute { get; } = new List<string>();
 
@@ -29,9 +30,9 @@ namespace Sql2SqlCloner.Core
             dbSource = new Server(SourceConnection).Databases[SourceConnection.DatabaseName];
             dbDestination = new Server(DestinationConnection).Databases[DestinationConnection.DatabaseName];
 
-            if (!int.TryParse(ConfigurationManager.AppSettings["SqlTimeout"], out SqlTimeout))
+            if (!int.TryParse(ConfigurationManager.AppSettings["SqlTimeout"], out sqlTimeout))
             {
-                SqlTimeout = 1800; //30 minutes
+                sqlTimeout = 1800; //30 minutes
             }
             lstPostExecutionExecute?.ToList().ForEach(item => LstPostExecutionExecute.Add(item));
         }
@@ -40,9 +41,16 @@ namespace Sql2SqlCloner.Core
         {
             get
             {
-                if (sourceConnection.SqlConnectionObject.State != ConnectionState.Open)
+                try
                 {
-                    sourceConnection.SqlConnectionObject.Open();
+                    if (sourceConnection.SqlConnectionObject.State != ConnectionState.Open)
+                    {
+                        sourceConnection.SqlConnectionObject.Open();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Error connecting to source server: " + sourceConnection.ServerInstance, ex);
                 }
                 return sourceConnection;
             }
@@ -52,9 +60,16 @@ namespace Sql2SqlCloner.Core
         {
             get
             {
-                if (destinationConnection.SqlConnectionObject.State != ConnectionState.Open)
+                try
                 {
-                    destinationConnection.SqlConnectionObject.Open();
+                    if (destinationConnection.SqlConnectionObject.State != ConnectionState.Open)
+                    {
+                        destinationConnection.SqlConnectionObject.Open();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Error connecting to destination server: " + destinationConnection.ServerInstance, ex);
                 }
                 return destinationConnection;
             }
@@ -66,7 +81,7 @@ namespace Sql2SqlCloner.Core
             {
                 commandSource.CommandText = sql;
                 commandSource.CommandType = CommandType.Text;
-                commandSource.CommandTimeout = SqlTimeout;
+                commandSource.CommandTimeout = sqlTimeout;
                 using (var reader = commandSource.ExecuteReader())
                 {
                     try
@@ -74,7 +89,7 @@ namespace Sql2SqlCloner.Core
                         using (SqlCommand commandDestination = DestinationConnection.SqlConnectionObject.CreateCommand())
                         {
                             commandDestination.CommandType = CommandType.Text;
-                            commandDestination.CommandTimeout = SqlTimeout;
+                            commandDestination.CommandTimeout = sqlTimeout;
                             while (reader.Read())
                             {
                                 try
@@ -98,7 +113,7 @@ namespace Sql2SqlCloner.Core
             {
                 commandSource.CommandText = sql;
                 commandSource.CommandType = CommandType.Text;
-                commandSource.CommandTimeout = SqlTimeout;
+                commandSource.CommandTimeout = sqlTimeout;
                 using (var reader = commandSource.ExecuteReader())
                 {
                     while (reader.Read())
@@ -112,7 +127,7 @@ namespace Sql2SqlCloner.Core
                 using (SqlCommand commandDestination = DestinationConnection.SqlConnectionObject.CreateCommand())
                 {
                     commandDestination.CommandType = CommandType.Text;
-                    commandDestination.CommandTimeout = SqlTimeout;
+                    commandDestination.CommandTimeout = sqlTimeout;
                     lstToRun.ForEach(item =>
                     {
                         try

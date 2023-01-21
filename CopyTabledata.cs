@@ -377,8 +377,7 @@ namespace Sql2SqlCloner
                         label2.Text += $", Total running time {(timeDiff.Days == 0 ? "" : timeDiff.Days + " days ") + timeDiff.ToString("hh\\:mm\\:ss")}";
                     }
                     MessageBox.Show(msgResult);
-                    btnPause.Text = "Start over";
-                    btnCopyMessages.Visible = btnCopyMessages.Enabled = btnPause.Enabled = true;
+                    btnCopyMessages.Visible = btnCopyMessages.Enabled = true;
                     btnCancel.Enabled = true;
                 }
                 else
@@ -389,6 +388,8 @@ namespace Sql2SqlCloner
                     autoScrollGrid.Left -= 30;
                     MessageBox.Show(label1.Text);
                 }
+                btnPause.Text = "Start over";
+                btnPause.Enabled = true;
                 Cursor = Cursors.Default;
                 dataGridView1.Cursor = Cursors.Default;
             }

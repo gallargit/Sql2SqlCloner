@@ -77,7 +77,7 @@ namespace Sql2SqlCloner.Components
             CheckBoxes = false; // Disable default CheckBox functionality if it's been enabled
             // Give every node an initial 'unchecked' image
             IgnoreClickAction++; // we're making changes to the tree, ignore any other change requests
-            UpdateChildState(this.Nodes, (int)CheckedState.UnChecked, false, true);
+            UpdateChildState(Nodes, (int)CheckedState.UnChecked, false, true);
             IgnoreClickAction--;
         }
 

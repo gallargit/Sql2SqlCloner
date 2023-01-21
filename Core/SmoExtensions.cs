@@ -1,5 +1,7 @@
 ﻿using Microsoft.SqlServer.Management.Common;
 using Microsoft.SqlServer.Management.Smo;
+using System;
+using System.Threading;
 
 namespace Sql2SqlCloner.Core
 {
@@ -47,21 +49,52 @@ namespace Sql2SqlCloner.Core
 
         public static bool GetTableProperty(this Table t, string propertyName)
         {
-            Database db = t.Parent;
+            int retries = 3;
+            var lasterror = "";
+            while (retries > 0)
+            {
+                try
+                {
+                    Database db = t.Parent;
 
-            if (propertyName == nameof(t.ChangeTrackingEnabled) && !db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
-            {
-                return false;
+                    if (propertyName == nameof(t.ChangeTrackingEnabled) && !db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+                    {
+                        return false;
+                    }
+                    else if ((propertyName == nameof(t.IsMemoryOptimized) || propertyName == nameof(t.IsSystemVersioned))
+                        && !db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        return (bool)t.GetType().GetProperty(propertyName).GetValue(t);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    //quick retry to workaround deadlocks
+                    lasterror = ex.Message;
+                    if (ex.InnerException != null)
+                    {
+                        if (ex.InnerException.Message.StartsWith("Transaction") && ex.InnerException.Message.Contains("was deadlocked"))
+                        {
+                            retries--;
+                            lasterror = ex.InnerException.Message;
+                            Thread.Sleep(200);
+                        }
+                        else
+                        {
+                            retries = 0;
+                        }
+                    }
+                    else
+                    {
+                        retries = 0;
+                    }
+                }
             }
-            else if ((propertyName == nameof(t.IsMemoryOptimized) || propertyName == nameof(t.IsSystemVersioned))
-                && !db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
-            {
-                return false;
-            }
-            else
-            {
-                return (bool)t.GetType().GetProperty(propertyName).GetValue(t);
-            }
+            throw new Exception(lasterror);
         }
     }
 }

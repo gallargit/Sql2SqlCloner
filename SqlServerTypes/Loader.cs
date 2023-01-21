@@ -70,7 +70,10 @@ namespace SqlServerTypes
                     if (sqlClientDirectories.Any())
                     {
                         var sqlClientDirectory = sqlClientDirectories.OrderBy(d => d).Last();
-                        packageBinaryPath = Path.Combine(packageBinaryPath, sqlClientDirectory, "build", "net46", SNIDll);
+                        packageBinaryPath = Path.Combine(packageBinaryPath, sqlClientDirectory, "build");
+                        //this could be "net46" or "net462" in the newer versions
+                        packageBinaryPath = Directory.GetDirectories(packageBinaryPath).Where(d => d.Contains("net4")).OrderBy(d => d).Last();
+                        packageBinaryPath = Path.Combine(packageBinaryPath, SNIDll);
                         if (File.Exists(packageBinaryPath))
                         {
                             File.Copy(packageBinaryPath, SNIAssemblyName, false);
@@ -87,10 +90,7 @@ namespace SqlServerTypes
             var ptr = LoadLibrary(fullAssemblyName);
             if (ptr == IntPtr.Zero)
             {
-                throw new Exception(string.Format(
-                    "Error loading {0} (ErrorCode: {1})",
-                    fullAssemblyName,
-                    Marshal.GetLastWin32Error()));
+                throw new Exception(string.Format("Error loading {0} (ErrorCode: {1})", fullAssemblyName, Marshal.GetLastWin32Error()));
             }
         }
     }
