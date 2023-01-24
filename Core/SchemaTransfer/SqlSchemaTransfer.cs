@@ -948,6 +948,15 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
+            foreach (Default item in db.Defaults)
+            {
+                items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+            }
+            if (cancelToken.IsCancellationRequested)
+            {
+                return items;
+            }
+
             foreach (UserDefinedDataType item in db.UserDefinedDataTypes)
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
@@ -1038,15 +1047,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         dicTables[reader["TableName"].ToString()] = (long)reader["RowCountNum"];
                     }
                 }
-            }
-            if (cancelToken.IsCancellationRequested)
-            {
-                return items;
-            }
-
-            foreach (Default item in db.Defaults)
-            {
-                items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
             if (cancelToken.IsCancellationRequested)
             {
@@ -1507,6 +1507,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             transferDrop.transfer.Options.ContinueScriptingOnError = true;
             transferDrop.transfer.CopyAllObjects = false;
             transferDrop.ResetTransfer();
+
+            //Restore default database principals if necessary
+            RunInDestination(@"SELECT 'ALTER AUTHORIZATION ON SCHEMA::' + QUOTENAME(name) + ' TO dbo'
+                            FROM sys.schemas WHERE schema_id<>principal_id
+                            AND name IN ('dbo','guest','INFORMATION_SCHEMA','sys','db_owner','db_accessadmin','db_securityadmin',
+                            'db_ddladmin','db_backupoperator','db_datareader','db_datawriter','db_denydatareader','db_denydatawriter')");
+
             while (remaining > 0 && lastCount != remaining)
             {
                 var destinations = new BlockingCollection<NamedSmoObject>();

@@ -59,7 +59,6 @@ namespace Sql2SqlCloner
             }
             CopyList.ForEach(c => c.Status = Properties.Resources.empty);
             dataGridView1.DataSource = CopyList;
-
             label1.Text = "Click on the 'Copy' button to start copying below listed SQL objects";
             if (autoStart)
             {
@@ -75,6 +74,17 @@ namespace Sql2SqlCloner
                 Close();
                 return;
             }
+            if (Properties.Settings.Default.ClearDestinationDatabase &&
+                ConfigurationManager.AppSettings["DeleteDatabaseConfirm"]?.Equals("true", StringComparison.InvariantCultureIgnoreCase) == true &&
+                MessageBox.Show($"The database '{SchemaTransfer.DestinationCxInfo()}' is about to be cleared. Continue?",
+                    "Database deletion",
+                    MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+            {
+                DialogResult = DialogResult.Cancel;
+                Environment.Exit(0);
+                return;
+            }
+
             stopwatch1.Start();
             Timer1.Start();
             btnNext.Enabled = false;
@@ -248,8 +258,7 @@ namespace Sql2SqlCloner
                                 {
                                     HandleWarning(item, ex);
                                 }
-                                else
-                                if ((item.Type == "Table" || item.Type == "View") && previousListCount != currList.Count)
+                                else if ((item.Type == "Table" || item.Type == "View") && previousListCount != currList.Count)
                                 {
                                     lstDelete.Add($"IF OBJECT_ID('{item.Object}','{item.Type.Substring(0, 1).Replace("T", "U")}') IS NOT NULL DROP {item.Type.ToUpperInvariant()} {item.Object}");
                                     //if this table/view is to be deleted, set its triggers as deleted
@@ -297,6 +306,10 @@ namespace Sql2SqlCloner
                                     item.Error += exc.Message;
                                 }
                                 exc = exc.InnerException;
+                                if (item.Parent != null)
+                                {
+                                    item.Error += ";" + item.Parent.Type + ": " + item.Parent.Name;
+                                }
                             }
                             if (item.Status.Tag.ToString() != "WARNING")
                             {
@@ -602,25 +615,6 @@ namespace Sql2SqlCloner
 
         private void CopySchema_Load(object sender, EventArgs e)
         {
-            if (Properties.Settings.Default.ClearDestinationDatabase)
-            {
-                if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"] != null)
-                {
-                    if (ConfigurationManager.AppSettings["DeleteDatabaseConfirm"].Equals("true", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        if (MessageBox.Show(
-                            $"The database '{SchemaTransfer.DestinationCxInfo()}' is about to be cleared. Continue?",
-                            "Database deletion",
-                            MessageBoxButtons.OKCancel) == DialogResult.Cancel)
-                        {
-                            DialogResult = DialogResult.Cancel;
-                            Environment.Exit(0);
-                            return;
-                        }
-                    }
-                }
-            }
-
             Icon = Icon.FromHandle(Properties.Resources.Clone.Handle);
             RefreshDataGrid();
         }
