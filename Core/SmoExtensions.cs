@@ -7,9 +7,9 @@ namespace Sql2SqlCloner.Core
 {
     public enum SQL_Versions
     {
-        SQL_2008_Version = 655,
-        SQL_2012_Version = 706,
-        SQL_2016_Version = 852
+        SQL_2008_Version = 100,
+        SQL_2012_Version = 110,
+        SQL_2016_Version = 130
     }
 
     public static class SmoExtensions
@@ -21,7 +21,7 @@ namespace Sql2SqlCloner.Core
                 var isRunningMinimumSQL2008 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
                 if (!isRunningMinimumSQL2008)
                 {
-                    isRunningMinimumSQL2008 = db.Version >= (int)SQL_Versions.SQL_2008_Version;
+                    isRunningMinimumSQL2008 = (int)db.CompatibilityLevel >= (int)SQL_Versions.SQL_2008_Version;
                 }
                 return isRunningMinimumSQL2008;
             }
@@ -30,7 +30,7 @@ namespace Sql2SqlCloner.Core
                 var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
                 if (!isRunningMinimumSQL2012)
                 {
-                    isRunningMinimumSQL2012 = db.Version >= (int)SQL_Versions.SQL_2012_Version;
+                    isRunningMinimumSQL2012 = (int)db.CompatibilityLevel >= (int)SQL_Versions.SQL_2012_Version;
                 }
                 return isRunningMinimumSQL2012;
             }
@@ -39,7 +39,7 @@ namespace Sql2SqlCloner.Core
                 var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
                 if (!isRunningMinimumSQL2016)
                 {
-                    isRunningMinimumSQL2016 = db.Version >= (int)SQL_Versions.SQL_2016_Version;
+                    isRunningMinimumSQL2016 = (int)db.CompatibilityLevel >= (int)SQL_Versions.SQL_2016_Version;
                 }
                 return isRunningMinimumSQL2016;
             }
@@ -47,9 +47,14 @@ namespace Sql2SqlCloner.Core
             return false;
         }
 
+        public static bool IsAzureDatabase(this Database db)
+        {
+            return db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
+        }
+
         public static bool GetTableProperty(this Table t, string propertyName)
         {
-            int retries = 3;
+            int retries = 4;
             var lasterror = "";
             while (retries > 0)
             {

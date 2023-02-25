@@ -6,5 +6,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
     {
         public string SQL { get; set; }
         public string Separators { get; set; }
+        public bool IsLastToken { get; set; }
     }
 }

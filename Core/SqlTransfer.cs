@@ -149,10 +149,10 @@ namespace Sql2SqlCloner.Core
                 command.CommandType = CommandType.Text;
                 command.CommandTimeout = 0; //no timeout for enabling checks
 
-                command.CommandText = "EXEC sp_MSforeachtable \"ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all\"";
+                command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL'";
                 command.ExecuteNonQuery();
 
-                command.CommandText = "EXEC sp_MSforeachtable \"ALTER TABLE ? ENABLE TRIGGER ALL\"";
+                command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? ENABLE TRIGGER ALL'";
                 command.ExecuteNonQuery();
             }
         }
@@ -232,10 +232,10 @@ namespace Sql2SqlCloner.Core
                 command.Connection = DestinationConnection.SqlConnectionObject;
                 command.CommandTimeout = 0;
 
-                command.CommandText = "EXEC sp_MSforeachtable \"ALTER TABLE ? NOCHECK CONSTRAINT ALL\"";
+                command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'";
                 command.ExecuteNonQuery();
 
-                command.CommandText = "EXEC sp_MSforeachtable \"ALTER TABLE ? DISABLE TRIGGER ALL\"";
+                command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'";
                 command.ExecuteNonQuery();
             }
         }

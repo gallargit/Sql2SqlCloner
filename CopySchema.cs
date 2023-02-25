@@ -11,6 +11,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Sql2SqlCloner
@@ -24,6 +25,7 @@ namespace Sql2SqlCloner
         private string lastError = "";
         private string currentlyCopying = "";
         private double current;
+        private double currentBackground = 0;
         private int errorCount;
         private int currrow;
         private int percentage;
@@ -112,6 +114,63 @@ namespace Sql2SqlCloner
                 item.Type = currObject.GetType().Name;
                 item.Object = currObject;
                 dataGridView1.Invoke(new Action(() => dataGridView1.Refresh()));
+            }
+        }
+
+        private void ProcessItemsBackground(SqlSchemaTransfer stransfer, IList<SqlSchemaObject> currList, bool overrideCollation, bool useSourceCollation)
+        {
+            foreach (var item in currList)
+            {
+                pause.WaitOne(Timeout.Infinite);
+                if (windowClosing)
+                {
+                    return;
+                }
+                if (backgroundWorker1.CancellationPending)
+                {
+                    break;
+                }
+
+                try
+                {
+                    currentBackground++;
+                    stransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
+                    item.Status = Properties.Resources.success;
+                    item.Status.Tag = "OK";
+                    if (item.Object is DatabaseDdlTrigger)
+                    {
+                        stransfer.RunInDestination($"SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' FROM sys.triggers WHERE name='{item.Name}'");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.StartsWith("Incompatible subitems"))
+                    {
+                        HandleWarning(item, ex);
+                    }
+                    else
+                    {
+                        item.Status = Properties.Resources.failure;
+                        item.Status.Tag = "ERROR";
+                        var exc = ex;
+                        while (exc != null)
+                        {
+                            if (exc.Message != item.Error)
+                            {
+                                if (item.Error != "")
+                                {
+                                    item.Error += ";";
+                                }
+                                item.Error += exc.Message;
+                            }
+                            exc = exc.InnerException;
+                            if (item.Parent != null)
+                            {
+                                item.Error += ";" + item.Parent.Type + ": " + item.Parent.Name;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -205,6 +264,23 @@ namespace Sql2SqlCloner
             {
                 currList.Remove(currList.First(t => (t.Object is Table table) && table.ID == systemhistorytable.HistoryTableID));
             }
+
+            //Experimental: enable multithreading background processing
+            Task tskBackground = null;
+            IList<SqlSchemaObject> backgroundList = null;
+            IList<string> backgroundListContainedTypes = new List<string>();
+            if (string.Equals(ConfigurationManager.AppSettings["EnableBackgroundProcessing"], "true", StringComparison.OrdinalIgnoreCase))
+            {
+                backgroundList = currList.Where(o => o.Object is StoredProcedure || o.Object is UserDefinedFunction).ToList();
+                backgroundListContainedTypes = backgroundList.Select(t => t.Type).Distinct().ToList();
+                var stBackground = new SqlSchemaTransfer(SchemaTransfer.SourceConnection.ConnectionString, SchemaTransfer.DestinationConnection.ConnectionString, true, SchemaTransfer.CancelToken)
+                {
+                    SourceObjects = backgroundList.ToList(),
+                    DestinationObjects = backgroundList.ToList()
+                };
+                tskBackground = Task.Run(() => ProcessItemsBackground(stBackground, backgroundList, overrideCollation, useSourceCollation));
+            }
+
             //the first time indexes won't be available, therefore some items dependent on them
             //such as FullText objects won't be created, the second time indexes will be available
             //so that those objects will be created
@@ -231,6 +307,11 @@ namespace Sql2SqlCloner
                     retries++;
                     foreach (var item in currList)
                     {
+                        if (retries == 1 && backgroundListContainedTypes.Contains(item.Type) && tskBackground != null)
+                        {
+                            //this item is being processed in the background
+                            continue;
+                        }
                         pause.WaitOne(Timeout.Infinite);
                         if (windowClosing)
                         {
@@ -318,15 +399,24 @@ namespace Sql2SqlCloner
                         }
                         if (retries == 1)
                         {
-                            backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
+                            current++;
+                            backgroundWorker1.ReportProgress((int)((current + currentBackground) / max * 100.0));
                             currrow++;
                         }
                     }
                     lstDelete.ForEach(t => new SqlCommand(t, SchemaTransfer.DestinationConnection.SqlConnectionObject).ExecuteNonQuery());
                     lstDelete.Clear();
+                    if (retries == 1 && tskBackground != null)
+                    {
+                        tskBackground.Wait();
+                        current += currentBackground;
+                        currentBackground = 0;
+                        errorCount += backgroundList.Count(item => !string.IsNullOrEmpty(item.Error));
+                    }
                     previousListCount = currList.Count;
                     finishedPass1 = errorCount == 0 || errorCount == currList.Count;
                 }
+
                 if (CopyConstraints)
                 {
                     finishedPass2 = finishedPass1 = errorCount == 0;

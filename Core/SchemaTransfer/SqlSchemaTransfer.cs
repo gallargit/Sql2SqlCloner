@@ -18,6 +18,11 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
     public class SqlSchemaTransfer : SqlTransfer
     {
         private const int TOKEN_DOT = 46;
+        private const int TOKEN_LEFT_PARENTHESIS = 40;
+        private const int TOKEN_RIGHT_PARENTHESIS = 41;
+        private const int TOKEN_COMMA = 44;
+        private const int TOKEN_MINUS = 45;
+        private const int TOKEN_SEMICOLON = 59;
         private Server sourceServer;
         private Server destinationServer;
         private Database sourceDatabase;
@@ -25,11 +30,11 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         private readonly Transfer transfer;
         private readonly List<string> existingschemas = new List<string> { "dbo" };
         private readonly Dictionary<string, string> schemaauths = new Dictionary<string, string>();
-        private readonly CancellationToken cancelToken;
+        public CancellationToken CancelToken { get; private set; }
         public readonly bool SameDatabase;
 
-        public List<SqlSchemaObject> SourceObjects { get; private set; }
-        public List<SqlSchemaObject> DestinationObjects { get; private set; }
+        public List<SqlSchemaObject> SourceObjects { get; set; }
+        public List<SqlSchemaObject> DestinationObjects { get; set; }
         public List<SqlSchemaObject> RecreateObjects { get; } = new List<SqlSchemaObject>();
 
         public bool IncludePermissions
@@ -79,7 +84,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
         public SqlSchemaTransfer(string src, string dst, bool skipPreload, CancellationToken ct) : base(src, dst, null)
         {
-            cancelToken = ct;
+            CancelToken = ct;
             RefreshAll(skipPreload);
 
             SameDatabase = SameServer() &&
@@ -373,29 +378,26 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     {
                         previousSpace = true;
                     }
+                    else if (previousSpace && !string.IsNullOrEmpty(currentToken.SQL))
+                    {
+                        previousSpace = false;
+                    }
                     else
                     {
-                        if (previousSpace && !string.IsNullOrEmpty(currentToken.SQL))
+                        var position = start - 1;
+                        var separators = new[] { '\n', '\r', '\t', ' ' };
+                        while (separators.Contains(sql[position]) && position > lastTokenEnd)
                         {
-                            previousSpace = false;
+                            position--;
                         }
-                        else
-                        {
-                            var position = start - 1;
-                            var separators = new[] { '\n', '\r', '\t', ' ' };
-                            while (separators.Contains(sql[position]) && position > lastTokenEnd)
-                            {
-                                position--;
-                            }
-                            position++;
+                        position++;
 
-                            if (position <= start - 1)
-                            {
-                                currentToken.Separators = sql.Substring(position, start - position);
-                            }
-                            currentToken.Separators = nextSeparator + currentToken.Separators;
-                            nextSeparator = "";
+                        if (position <= start - 1)
+                        {
+                            currentToken.Separators = sql.Substring(position, start - position);
                         }
+                        currentToken.Separators = nextSeparator + currentToken.Separators;
+                        nextSeparator = "";
                     }
                 }
 
@@ -411,6 +413,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 lastTokenEnd = end;
                 previousToken = currentToken;
             }
+            if (tokensResult.Any())
+            {
+                tokensResult.Last().IsLastToken = true;
+            }
 
             return tokensResult;
         }
@@ -424,6 +430,24 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 var creating_name = false;
                 var objectname_already_replaced = false;
                 var triggerON = false;
+                var RaiserrorTransform = string.Equals(ConfigurationManager.AppSettings["RaiserrorTransform"], "true", StringComparison.InvariantCultureIgnoreCase);
+                if (RaiserrorTransform &&
+                   ((sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
+                       destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version)) ||
+                    (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
+                       !destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))))
+                {
+                    //both databases are SQL2012 or newer, or both are older than SQL2012, RAISERROR should not be transformed
+                    RaiserrorTransform = false;
+                }
+
+                var raiserrorON = false;
+                var minusON = false;
+                var strTokenTest = "";
+                var tokenRaiseIndex = 1;
+                TokenInfoExtended[] raiserrorTOKENS = null;
+                IList<TokenInfoExtended> raiserrorTOKENSOld = null;
+                IList<string> raiserrorParameters = null;
                 var tokenIDForTrigger = 0;
                 var replaceNameObjects = new int[]
                 {
@@ -437,6 +461,214 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 TokenInfoExtended previousToken = null;
                 foreach (var currentToken in ParseSqlScript(script, removeSchemaBinding))
                 {
+                    //Experimental: enable RAISERROR transform from old format to new format
+                    if (raiserrorON)
+                    {
+                        if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
+                        destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+                        {
+                            //source is old, destination is new, apply new syntax
+                            if (raiserrorTOKENS == null)
+                            {
+                                raiserrorParameters = new List<string>();
+                                minusON = false;
+                                //format 1: RAISERROR('error message', 16, 1)
+                                //format 2: RAISERROR(50001, 16, 1)
+                                raiserrorTOKENSOld = new List<TokenInfoExtended>();
+                                raiserrorTOKENS = new TokenInfoExtended[8];
+                                raiserrorTOKENS[0] = new TokenInfoExtended() { SQL = "(", Token = TOKEN_LEFT_PARENTHESIS };
+
+                                raiserrorTOKENS[1] = new TokenInfoExtended() { SQL = "50001", Token = (int)Tokens.TOKEN_INTEGER }; //id
+                                raiserrorTOKENS[2] = new TokenInfoExtended() { SQL = null, Token = (int)Tokens.TOKEN_STRING }; //error msg
+
+                                raiserrorTOKENS[3] = new TokenInfoExtended() { SQL = ",", Token = TOKEN_COMMA };
+                                raiserrorTOKENS[4] = new TokenInfoExtended() { SQL = "16", Token = (int)Tokens.TOKEN_INTEGER }; //severity
+
+                                raiserrorTOKENS[5] = new TokenInfoExtended() { SQL = ",", Token = TOKEN_COMMA };
+                                raiserrorTOKENS[6] = new TokenInfoExtended() { SQL = "1", Token = (int)Tokens.TOKEN_INTEGER }; //state
+
+                                raiserrorTOKENS[7] = new TokenInfoExtended() { SQL = ")", Token = TOKEN_RIGHT_PARENTHESIS };
+                                tokenRaiseIndex = 1;
+                            }
+                            if (currentToken.Token == (int)Tokens.TOKEN_INTEGER || currentToken.Token == (int)Tokens.TOKEN_VARIABLE)
+                            {
+                                if (currentToken.Token == (int)Tokens.TOKEN_VARIABLE)
+                                {
+                                    raiserrorParameters.Add("DECLARE " + currentToken.SQL + " INT=" + raiserrorTOKENS[tokenRaiseIndex].SQL);
+                                }
+                                raiserrorTOKENS[tokenRaiseIndex].SQL = (minusON ? "-" : "") + currentToken.SQL;
+                                if (tokenRaiseIndex == 1)
+                                {
+                                    tokenRaiseIndex++;
+                                }
+                                tokenRaiseIndex += 2;
+                                minusON = false;
+                                raiserrorTOKENSOld.Add(currentToken);
+                                if (!currentToken.IsLastToken)
+                                {
+                                    continue;
+                                }
+                            }
+                            else if (currentToken.Token == (int)Tokens.TOKEN_STRING)
+                            {
+                                raiserrorTOKENS[2].SQL = currentToken.SQL;
+                                tokenRaiseIndex += 2;
+                                raiserrorTOKENSOld.Add(currentToken);
+                                if (!currentToken.IsLastToken)
+                                {
+                                    continue;
+                                }
+                            }
+
+                            if (currentToken.Token == TOKEN_LEFT_PARENTHESIS)
+                            {
+                                //new syntax detected, no need to replace; use whatever was found and go on
+                                sb.Append(strTokenTest);
+                                raiserrorTOKENSOld.Add(currentToken);
+                                raiserrorTOKENSOld.ToList().ForEach(t => sb.Append(t.Separators).Append(t.SQL));
+                                raiserrorTOKENS = null;
+                                raiserrorON = false;
+                                continue;
+                            }
+
+                            if (currentToken.Token == (int)Tokens.LEX_WHITE ||
+                                currentToken.Token == (int)Tokens.LEX_END_OF_LINE_COMMENT ||
+                                currentToken.Token == (int)Tokens.LEX_MULTILINE_COMMENT ||
+                                currentToken.Token == (int)Tokens.TOKEN_VARIABLE ||
+                                currentToken.Token == TOKEN_SEMICOLON ||
+                                currentToken.Token == TOKEN_COMMA ||
+                                currentToken.Token == TOKEN_LEFT_PARENTHESIS ||
+                                currentToken.Token == TOKEN_RIGHT_PARENTHESIS)
+                            {
+                                raiserrorTOKENSOld.Add(currentToken);
+                                if (!currentToken.IsLastToken)
+                                {
+                                    continue;
+                                }
+                            }
+                            if (currentToken.Token == TOKEN_MINUS)
+                            {
+                                minusON = true;
+                                if (!currentToken.IsLastToken)
+                                {
+                                    continue;
+                                }
+                            }
+                        }
+                        else if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
+                            destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+                        {
+                            //source is old, destination is new, keep old sntax
+                            sb.Append(strTokenTest);
+                        }
+
+                        //here either there was nothing to do or we have already passed Raiserror, create it if needed and go on
+                        if (raiserrorON)
+                        {
+                            if (raiserrorTOKENS[2].SQL != null)
+                            {
+                                //error message has been set, remove error number (usually "50000")
+                                raiserrorTOKENS = raiserrorTOKENS.Take(1).Concat(raiserrorTOKENS.Skip(2)).ToArray();
+                            }
+                            else
+                            {
+                                //error message has not been set, throw error number (usually "50000")
+                                raiserrorTOKENS = raiserrorTOKENS.Take(2).Concat(raiserrorTOKENS.Skip(3)).ToArray();
+                                if (!raiserrorTOKENS[1].SQL.StartsWith("@"))
+                                {
+                                    //since 50000 is not allowed, change it to 50001 to avoid the following error:
+                                    //Error number 50000 is invalid. The number must be from 13000 through 2147483647 and it cannot be 50000.
+                                    int intErrorNumber = 50001;
+                                    if (int.TryParse(raiserrorTOKENS[1].SQL, out int parseIntSQL))
+                                    {
+                                        if (parseIntSQL < 13000)
+                                        {
+                                            intErrorNumber = 13000;
+                                        }
+                                        else if (parseIntSQL == 50000)
+                                        {
+                                            intErrorNumber = 50001;
+                                        }
+                                        else
+                                        {
+                                            intErrorNumber = parseIntSQL;
+                                        }
+                                    }
+                                    raiserrorTOKENS[1].SQL = intErrorNumber.ToString();
+                                }
+                                raiserrorON = false;
+                            }
+
+                            var strTokenTestExecute = strTokenTest;
+                            raiserrorTOKENSOld.ToList().ForEach(t => strTokenTestExecute += t.Separators + t.SQL);
+                            foreach (var parameter in raiserrorParameters)
+                            {
+                                strTokenTestExecute = parameter + Environment.NewLine + strTokenTestExecute;
+                            }
+                            using (SqlCommand myCommand = new SqlCommand(strTokenTestExecute, DestinationConnection.SqlConnectionObject))
+                            {
+                                if (raiserrorTOKENS != null)
+                                {
+                                    //check if current RAISERROR syntax is good                                
+                                    try
+                                    {
+                                        myCommand.ExecuteNonQuery();
+                                    }
+                                    catch (SqlException e)
+                                    {
+                                        if (e.Number == 102 && e.Message.StartsWith("Incorrect syntax near"))
+                                        {
+                                            //old RAISERROR syntax detected, use new syntax
+                                            strTokenTestExecute = strTokenTest;
+                                            foreach (var parameter in raiserrorParameters)
+                                            {
+                                                strTokenTestExecute = parameter + Environment.NewLine + strTokenTestExecute;
+                                            }
+                                            raiserrorTOKENS.ToList().ForEach(t => strTokenTestExecute += t.Separators + t.SQL);
+                                            try
+                                            {
+                                                myCommand.CommandText = strTokenTestExecute;
+                                                myCommand.ExecuteNonQuery();
+                                            }
+                                            catch (Exception newex)
+                                            {
+                                                if (raiserrorTOKENS[1].SQL.Contains(newex.Message) ||
+                                                    (newex.Message.StartsWith("Error") && newex.Message.Contains("was raised")))
+                                                {
+                                                    //new syntax works
+                                                    sb.Append(strTokenTest);
+                                                    raiserrorTOKENS.ToList().ForEach(t => sb.Append(t.Separators).Append(t.SQL));
+                                                }
+                                                else
+                                                {
+                                                    //new syntax is also wrong
+                                                    throw e;
+                                                }
+                                            }
+                                        }
+                                        else if ((e.Message.StartsWith("Error") && e.Message.Contains("was raised")) ||
+                                            e.Number == 50000)
+                                        {
+                                            //old syntax was good, no error
+                                            sb.Append(strTokenTest);
+                                            raiserrorTOKENSOld.ToList().ForEach(t => sb.Append(t.Separators).Append(t.SQL));
+                                        }
+                                        else
+                                        {
+                                            throw;
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        throw;
+                                    }
+                                }
+                            }
+                            raiserrorON = false;
+                            raiserrorTOKENS = null;
+                        }
+                    }
+
                     //replace the scripted object's name with the actual name, explained below
                     if (creating_name &&
                         (currentToken.Token == (int)Tokens.TOKEN_ID || currentToken.Token == TOKEN_DOT) &&
@@ -503,6 +735,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         triggerON = true;
                         creating_name = true;
                         tokenIDForTrigger = 0;
+                    }
+
+                    if (RaiserrorTransform && currentToken.Token == (int)Tokens.TOKEN_RAISERROR)
+                    {
+                        strTokenTest = currentToken.Separators + currentToken.SQL;
+                        raiserrorON = true;
+                        continue;
                     }
 
                     if (previousToken != null &&
@@ -889,12 +1128,18 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
+            }
+            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
+                !dbSource.IsAzureDatabase() &&
+                !dbDestination.IsAzureDatabase())
+            {
+                //searchpropertylists are not supported in Azure, ignore them if either of the databases is on Azure
                 foreach (SearchPropertyList item in db.SearchPropertyLists)
                 {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -913,7 +1158,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -925,7 +1170,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -934,7 +1179,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -943,7 +1188,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -952,7 +1197,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -961,7 +1206,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -973,7 +1218,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -982,7 +1227,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -995,7 +1240,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1004,7 +1249,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1016,7 +1261,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1048,7 +1293,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     }
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1074,7 +1319,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
 
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1103,7 +1348,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
-                if (cancelToken.IsCancellationRequested)
+                if (CancelToken.IsCancellationRequested)
                 {
                     return items;
                 }
@@ -1112,7 +1357,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     items.Add(new SqlSchemaObject { Name = $"{item.Name}", Object = item, Type = item.GetType().Name });
                 }
-                if (cancelToken.IsCancellationRequested)
+                if (CancelToken.IsCancellationRequested)
                 {
                     return items;
                 }
@@ -1120,7 +1365,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     items.Add(new SqlSchemaObject { Name = $"{item.Name}", Object = item, Type = item.GetType().Name });
                 }
-                if (cancelToken.IsCancellationRequested)
+                if (CancelToken.IsCancellationRequested)
                 {
                     return items;
                 }
@@ -1130,7 +1375,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1142,7 +1387,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1154,7 +1399,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
-            if (cancelToken.IsCancellationRequested)
+            if (CancelToken.IsCancellationRequested)
             {
                 return items;
             }
@@ -1346,12 +1591,15 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         {
                             CatalogName = fulltextind.CatalogName,
                             FilegroupName = fulltextind.FilegroupName,
-                            SearchPropertyListName = fulltextind.SearchPropertyListName,
                             StopListName = fulltextind.StopListName,
                             StopListOption = fulltextind.StopListOption,
                             UniqueIndexName = fulltextind.UniqueIndexName,
                             UserData = fulltextind.UserData
                         };
+                        if (!string.IsNullOrEmpty(fulltextind.SearchPropertyListName) && !dbDestination.IsAzureDatabase())
+                        {
+                            index.SearchPropertyListName = fulltextind.SearchPropertyListName;
+                        }
 
                         foreach (FullTextIndexColumn srccol in fulltextind.IndexedColumns)
                         {
@@ -1463,7 +1711,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 var tskSource = Task.Run(() =>
                 {
                     sourceDatabase.PrefetchObjects(typeof(Table), new ScriptingOptions());
-                    if (!cancelToken.IsCancellationRequested)
+                    if (!CancelToken.IsCancellationRequested)
                     {
                         SourceObjects = GetSqlObjects(SourceConnection, sourceDatabase);
                     }
@@ -1475,7 +1723,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                 var tskDestination = Task.Run(() =>
                 {
-                    if (!cancelToken.IsCancellationRequested)
+                    if (!CancelToken.IsCancellationRequested)
                     {
                         DestinationObjects = GetSqlObjects(DestinationConnection, destinationDatabase);
                     }
@@ -1501,11 +1749,11 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             //destination server (property "transfer.Scripter" is always the source server, not the destination)
             //therefore instead of using the "this" object a new one is created and all of the drop operations
             //will be performed there
-            var transferDrop = new SqlSchemaTransfer(destinationConnectionString, destinationConnectionString, true, cancelToken);
-            transferDrop.transfer.Options.ScriptDrops = true;
-            transferDrop.transfer.Options.IncludeIfNotExists = true;
-            transferDrop.transfer.Options.ContinueScriptingOnError = true;
+            var transferDrop = new SqlSchemaTransfer(destinationConnectionString, destinationConnectionString, true, CancelToken);
             transferDrop.transfer.CopyAllObjects = false;
+            transferDrop.transfer.Options.ScriptDrops =
+            transferDrop.transfer.Options.IncludeIfNotExists =
+            transferDrop.transfer.Options.ContinueScriptingOnError = true;
             transferDrop.ResetTransfer();
 
             //Restore default database principals if necessary
@@ -1538,7 +1786,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 command.CommandTimeout = sqlTimeout;
                                 foreach (Table table in DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object).Cast<Table>())
                                 {
-                                    if (cancelToken.IsCancellationRequested)
+                                    if (CancelToken.IsCancellationRequested)
                                     {
                                         return;
                                     }
@@ -1580,7 +1828,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 processed = 0;
                                 foreach (var obj in destinations.GetConsumingEnumerable())
                                 {
-                                    if (cancelToken.IsCancellationRequested)
+                                    if (CancelToken.IsCancellationRequested)
                                     {
                                         return;
                                     }
@@ -1624,7 +1872,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                         producerTablesAndSchemas.Wait();
 
-                        if (cancelToken.IsCancellationRequested)
+                        if (CancelToken.IsCancellationRequested)
                         {
                             return;
                         }
