@@ -1,5 +1,5 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.SqlServer.Management.Smo;
+﻿using Microsoft.SqlServer.Management.Smo;
+using Sql2SqlCloner.Components;
 using Sql2SqlCloner.Core;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
@@ -22,6 +22,7 @@ namespace Sql2SqlCloner
         private readonly SqlSchemaTransfer SchemaTransfer;
         private readonly bool closeIfSuccess;
         private readonly bool disableNotForReplication;
+        private SqlSchemaTransfer stGetData;
         private string lastError = "";
         private string currentlyCopying = "";
         private double current;
@@ -136,7 +137,8 @@ namespace Sql2SqlCloner
                     currentBackground++;
                     stransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
                     item.Status = Properties.Resources.success;
-                    item.Status.Tag = "OK";
+                    item.Status.Tag = Constants.OK;
+                    item.Error = "";
                     if (item.Object is DatabaseDdlTrigger)
                     {
                         stransfer.RunInDestination($"SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' FROM sys.triggers WHERE name='{item.Name}'");
@@ -151,7 +153,7 @@ namespace Sql2SqlCloner
                     else
                     {
                         item.Status = Properties.Resources.failure;
-                        item.Status.Tag = "ERROR";
+                        item.Status.Tag = Constants.ERROR;
                         var exc = ex;
                         while (exc != null)
                         {
@@ -185,9 +187,10 @@ namespace Sql2SqlCloner
                 {
                     Name = "Clearing database",
                     Type = "Database",
-                    Object = new Database() { Name = SchemaTransfer.DestinationConnection.DatabaseName },
+                    Object = new Database() { Name = SchemaTransfer.DestinationDatabaseName },
                     Status = Properties.Resources.waiting
                 });
+                CopyList[0].Status.Tag = Constants.WAITING;
 
                 RefreshDataGrid();
 
@@ -273,7 +276,7 @@ namespace Sql2SqlCloner
             {
                 backgroundList = currList.Where(o => o.Object is StoredProcedure || o.Object is UserDefinedFunction).ToList();
                 backgroundListContainedTypes = backgroundList.Select(t => t.Type).Distinct().ToList();
-                var stBackground = new SqlSchemaTransfer(SchemaTransfer.SourceConnection.ConnectionString, SchemaTransfer.DestinationConnection.ConnectionString, true, SchemaTransfer.CancelToken)
+                var stBackground = new SqlSchemaTransfer(SchemaTransfer.SourceConnectionString.Replace("=ADMIN:", "="), SchemaTransfer.DestinationConnectionString, true, null, SchemaTransfer.CancelToken)
                 {
                     SourceObjects = backgroundList.ToList(),
                     DestinationObjects = backgroundList.ToList()
@@ -312,6 +315,9 @@ namespace Sql2SqlCloner
                             //this item is being processed in the background
                             continue;
                         }
+
+                        currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'  {1 + current + currentBackground}/{currList.Count}";
+
                         pause.WaitOne(Timeout.Infinite);
                         if (windowClosing)
                         {
@@ -325,7 +331,8 @@ namespace Sql2SqlCloner
                         {
                             SchemaTransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
                             item.Status = Properties.Resources.success;
-                            item.Status.Tag = "OK";
+                            item.Status.Tag = Constants.OK;
+                            item.Error = "";
                             if (item.Object is DatabaseDdlTrigger)
                             {
                                 SchemaTransfer.RunInDestination($"SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' FROM sys.triggers WHERE name='{item.Name}'");
@@ -354,14 +361,14 @@ namespace Sql2SqlCloner
                                         {
                                             replaceStatus = true;
                                         }
-                                        else if (subitem.Status.Tag.ToString() != "ERROR")
+                                        else if (subitem.Status.Tag.ToString() != Constants.ERROR)
                                         {
                                             replaceStatus = true;
                                         }
                                         if (replaceStatus)
                                         {
                                             subitem.Status = Properties.Resources.failure;
-                                            subitem.Status.Tag = "ERROR";
+                                            subitem.Status.Tag = Constants.ERROR;
                                             subitem.Error = "Needs to be recreated";
                                         }
                                     }
@@ -371,7 +378,7 @@ namespace Sql2SqlCloner
                             if (string.IsNullOrEmpty(item.Error))
                             {
                                 item.Status = Properties.Resources.failure;
-                                item.Status.Tag = "ERROR";
+                                item.Status.Tag = Constants.ERROR;
                                 item.Error = string.Empty;
                             }
                             var exc = ex;
@@ -392,7 +399,7 @@ namespace Sql2SqlCloner
                                     item.Error += ";" + item.Parent.Type + ": " + item.Parent.Name;
                                 }
                             }
-                            if (item.Status.Tag.ToString() != "WARNING")
+                            if (item.Status.Tag.ToString() != Constants.WARNING)
                             {
                                 errorCount++;
                             }
@@ -404,7 +411,7 @@ namespace Sql2SqlCloner
                             currrow++;
                         }
                     }
-                    lstDelete.ForEach(t => new SqlCommand(t, SchemaTransfer.DestinationConnection.SqlConnectionObject).ExecuteNonQuery());
+                    lstDelete.ForEach(item => SchemaTransfer.RunInDestination($"SELECT '{item.Replace("'", "''")}'"));
                     lstDelete.Clear();
                     if (retries == 1 && tskBackground != null)
                     {
@@ -427,6 +434,7 @@ namespace Sql2SqlCloner
                     }
                     SchemaTransfer.RefreshDestination();
                     currentlyCopying = "Processing indexes...";
+
                     //tables should go first
                     foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").OrderBy(ix => ix.Type).ToList())
                     {
@@ -665,7 +673,7 @@ namespace Sql2SqlCloner
             if (item.Status != Properties.Resources.failure)
             {
                 item.Status = Properties.Resources.warning;
-                item.Status.Tag = "WARNING";
+                item.Status.Tag = Constants.WARNING;
                 item.Error = string.Empty;
                 var exc = ex;
                 while (exc != null)
@@ -848,6 +856,51 @@ namespace Sql2SqlCloner
         {
             //sometimes if the window is resized the datagrid creates new rows for no reason
             //this prevents the default error window from being shown, as it blocks the whole process
+        }
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            var waiting = false;
+            if (dataGridView1.Rows[0].Cells[0].Value != null &&
+                dataGridView1.Rows[0].Cells[0].Value is Bitmap &&
+                (dataGridView1.Rows[0].Cells[0].Value as Bitmap).Tag != null)
+            {
+                waiting = (dataGridView1.Rows[0].Cells[0].Value as Bitmap)?.Tag.ToString() == Constants.WAITING;
+            }
+            if (!waiting)
+            {
+                var objname = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString().Replace("[", "").Replace("]", "");
+                if (e.ColumnIndex == 5 && !string.IsNullOrEmpty(dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value.ToString()))
+                {
+                    NotepadHelper.ShowMessage(dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value.ToString(), objname);
+                    return;
+                }
+                if (stGetData == null)
+                {
+                    stGetData = new SqlSchemaTransfer(SchemaTransfer.SourceConnectionString.Replace("=ADMIN:", "="), SchemaTransfer.DestinationConnectionString, true, null, SchemaTransfer.CancelToken)
+                    {
+                        SourceObjects = SchemaTransfer.SourceObjects,
+                        DestinationObjects = SchemaTransfer.DestinationObjects
+                    };
+                }
+                try
+                {
+                    var sb = new StringBuilder();
+                    foreach (var objecttoscript in SchemaTransfer.SourceObjects.Where
+                        (o => o.Type == dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString() && o.Name == objname))
+                    {
+                        foreach (var item in stGetData.GetObjectSource(objecttoscript.Object))
+                        {
+                            sb.Append(item).Append(Environment.NewLine).Append("GO").Append(Environment.NewLine);
+                        }
+                    }
+                    if (sb.Length > 0)
+                    {
+                        NotepadHelper.ShowMessage(sb.ToString(), objname);
+                    }
+                }
+                catch { }
+            }
         }
     }
 }

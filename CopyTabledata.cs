@@ -1,4 +1,5 @@
 ﻿using Microsoft.SqlServer.Management.Smo;
+using Sql2SqlCloner.Components;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
@@ -43,6 +44,8 @@ namespace Sql2SqlCloner
             Visible = true;
             Cursor = Cursors.WaitCursor;
             dataGridView1.Rows.Add(Properties.Resources.waiting, "Calculating", "", null, "", 0);
+            (dataGridView1.Rows[0].Cells[0].Value as Bitmap).Tag = Constants.WAITING;
+
             stopwatch1.Start();
             Timer1.Start();
 
@@ -167,7 +170,7 @@ namespace Sql2SqlCloner
                         if (CURRENTTHREAD == 0)
                         {
                             //Prevent "ContextSwitchDeadlock Was Detected" exceptions
-                            if ((DateTime.Now - lastRefresh).TotalSeconds > 2)
+                            if ((DateTime.Now - lastRefresh).TotalSeconds > 1)
                             {
                                 var calculating = dataGridView1.Rows[0].Cells[1].Value.ToString();
                                 calculating += ".";
@@ -240,7 +243,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     var tableName = item.Cells["Table"].Value.ToString();
-                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()}.{tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}'";
+                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()}.{tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}' {currrow}/{dataGridView1.RowCount}";
                     if (item.Cells["TOP"].Value.ToString() != "0")
                     {
                         DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
@@ -251,13 +254,13 @@ namespace Sql2SqlCloner
                         DataTransfer.EnableTableConstraints(tableName);
                     }
                     item.Cells["Status"].Value = Properties.Resources.success;
-                    ((Bitmap)item.Cells["Status"].Value).Tag = "OK";
+                    ((Bitmap)item.Cells["Status"].Value).Tag = Constants.OK;
                     item.Cells["Result"].Value = $"{item.Cells["TOP"].Value} records copied";
                 }
                 catch (Exception exc)
                 {
                     item.Cells["Status"].Value = Properties.Resources.failure;
-                    ((Bitmap)item.Cells["Status"].Value).Tag = "ERROR";
+                    ((Bitmap)item.Cells["Status"].Value).Tag = Constants.ERROR;
                     item.Cells["Result"].Value = exc.Message;
                     if (exc.InnerException != null)
                     {
@@ -528,7 +531,7 @@ namespace Sql2SqlCloner
                 {
                     row.Visible = !autoScrollGrid.Checked ||
                        (!string.IsNullOrEmpty((string)row.Cells["Result"].Value) &&
-                       ((Bitmap)row.Cells["Status"].Value).Tag?.ToString() == "ERROR");
+                       ((Bitmap)row.Cells["Status"].Value).Tag?.ToString() == Constants.ERROR);
                 }
             }
         }
@@ -537,6 +540,29 @@ namespace Sql2SqlCloner
         {
             //sometimes if the window is resized the datagrid creates new rows for no reason
             //this prevents the default error window from being shown, as it blocks the whole process
+        }
+
+        private void dataGridView1_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            var waiting = false;
+            if (dataGridView1.Rows[0].Cells[0].Value != null &&
+                dataGridView1.Rows[0].Cells[0].Value is Bitmap &&
+                (dataGridView1.Rows[0].Cells[0].Value as Bitmap).Tag != null)
+            {
+                waiting = (dataGridView1.Rows[0].Cells[0].Value as Bitmap)?.Tag.ToString() == Constants.WAITING;
+            }
+
+            if (!waiting)
+            {
+                var objError = "";
+                if (dataGridView1.Rows[e.RowIndex].Cells[3].Value != null &&
+                    !(dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString()).ToString().Contains("records copied"))
+                {
+                    objError = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString() + Environment.NewLine + Environment.NewLine;
+                }
+                NotepadHelper.ShowMessage(objError + dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString(),
+                    dataGridView1.Rows[e.RowIndex].Cells[1].Value.ToString().Replace("[", "").Replace("]", ""));
+            }
         }
     }
 }

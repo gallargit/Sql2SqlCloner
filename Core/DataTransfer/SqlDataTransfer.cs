@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using Microsoft.SqlServer.Management.Common;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -20,10 +21,10 @@ namespace Sql2SqlCloner.Core.DataTransfer
         {
             try
             {
-                new SqlCommand($"ALTER TABLE {tableName} WITH CHECK CHECK CONSTRAINT all", DestinationConnection.SqlConnectionObject)
+                using (var command = GetDestinationSqlCommand(sqlTimeout, $"ALTER TABLE {tableName} WITH CHECK CHECK CONSTRAINT ALL"))
                 {
-                    CommandTimeout = sqlTimeout
-                }.ExecuteNonQuery();
+                    command.ExecuteNonQuery();
+                }
             }
             catch { }
         }
@@ -32,20 +33,13 @@ namespace Sql2SqlCloner.Core.DataTransfer
         {
             //enable constraints one by one, this will enable all disabled constraints (which can be enabled)
             //in a broken database and also remove the untrusted bit in all keys
-            const string SQLEnableConstraints = @"SELECT 
-	            'ALTER TABLE ' + [t].[name] + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([c].[name])
-                FROM
-                    sys.tables AS t
-                    INNER JOIN sys.check_constraints AS c ON t.[object_id] = c.parent_object_id
-                WHERE
-                    c.is_disabled = 1
-                UNION
-                SELECT 
-	            'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME([schema_id])) + N'.' + QUOTENAME(OBJECT_NAME([parent_object_id])) + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([name])
-                FROM 
-                    sys.foreign_keys 
-                WHERE 
-                    is_disabled = 1 OR is_not_trusted = 1";
+            const string SQLEnableConstraints = @"SELECT 'ALTER TABLE ' + [t].[name] + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([c].[name])
+                FROM sys.tables AS t INNER JOIN sys.check_constraints AS c ON t.[object_id]=c.parent_object_id
+                WHERE c.is_disabled=1
+            UNION
+                SELECT 'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME([schema_id])) + N'.' + QUOTENAME(OBJECT_NAME([parent_object_id])) + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([name])
+                FROM sys.foreign_keys 
+                WHERE is_disabled=1 OR is_not_trusted=1";
 
             var finished = false;
             var incompliantDataDeletion = ConfigurationManager.AppSettings["IncompliantDataDeletion"].ToLowerInvariant();
@@ -82,21 +76,18 @@ namespace Sql2SqlCloner.Core.DataTransfer
                             QUOTENAME(schema_name(pk_tab.schema_id)) + '.' + QUOTENAME(pk_tab.name) AS primary_table,
                             QUOTENAME(pk_col.name) AS primary_column
                             FROM sys.tables tab
-                            INNER JOIN sys.columns col ON col.object_id = tab.object_id
+                            INNER JOIN sys.columns col ON col.object_id=tab.object_id
                             INNER JOIN sys.foreign_key_columns fk_cols
-                                ON fk_cols.parent_object_id = tab.object_id AND fk_cols.parent_column_id = col.column_id
-                            INNER JOIN sys.foreign_keys fk ON fk.object_id = fk_cols.constraint_object_id
-                            INNER JOIN sys.tables pk_tab ON pk_tab.object_id = fk_cols.referenced_object_id
+                                ON fk_cols.parent_object_id = tab.object_id AND fk_cols.parent_column_id=col.column_id
+                            INNER JOIN sys.foreign_keys fk ON fk.object_id=fk_cols.constraint_object_id
+                            INNER JOIN sys.tables pk_tab ON pk_tab.object_id=fk_cols.referenced_object_id
                             INNER JOIN sys.columns pk_col
-                                ON pk_col.column_id = fk_cols.referenced_column_id AND pk_col.object_id = fk_cols.referenced_object_id
+                                ON pk_col.column_id=fk_cols.referenced_column_id AND pk_col.object_id=fk_cols.referenced_object_id
                             ORDER BY 5,3,1,2";
 
-                        using (SqlCommand command = DestinationConnection.SqlConnectionObject.CreateCommand())
+                        var lstDelete = new List<string>();
+                        using (var command = GetDestinationSqlCommand(sqlTimeout, sql))
                         {
-                            command.CommandText = sql;
-                            command.CommandTimeout = sqlTimeout;
-                            command.CommandType = CommandType.Text;
-                            var lstDelete = new List<string>();
                             using (var reader = command.ExecuteReader())
                             {
                                 var deletesentence = "";
@@ -124,22 +115,20 @@ namespace Sql2SqlCloner.Core.DataTransfer
                                     lstDelete.Add(deletesentence += ")");
                                 }
                             }
-                            var deletedrows = 0;
-                            using (SqlCommand cmdDelete = new SqlCommand())
+                        }
+                        var deletedrows = 0;
+                        using (var cmdDelete = GetDestinationSqlCommand(sqlTimeout))
+                        {
+                            lstDelete.ForEach(deletecommand =>
                             {
-                                cmdDelete.Connection = DestinationConnection.SqlConnectionObject;
-                                cmdDelete.CommandTimeout = sqlTimeout;
-                                lstDelete.ForEach(deletecommand =>
-                                {
-                                    cmdDelete.CommandText = deletecommand;
-                                    deletedrows += cmdDelete.ExecuteNonQuery();
-                                });
-                            }
-                            if (deletedrows == 0)
-                            {
-                                MessageBox.Show($"No data left to delete, could not enable constraints. Last error was: {ex.Message}");
-                                throw new Exception(ex.Message);
-                            }
+                                cmdDelete.CommandText = deletecommand;
+                                deletedrows += cmdDelete.ExecuteNonQuery();
+                            });
+                        }
+                        if (deletedrows == 0)
+                        {
+                            MessageBox.Show($"No data left to delete, could not enable constraints. Last error was: {ex.Message}");
+                            throw new Exception(ex.Message);
                         }
                     }
                     else
@@ -156,14 +145,14 @@ namespace Sql2SqlCloner.Core.DataTransfer
             }
         }
 
-        private IEnumerable<string> GetMapping(SqlConnection cxSource, SqlConnection cxTarget, string tableName)
+        private IEnumerable<string> GetMapping(ServerConnection cxSource, ServerConnection cxTarget, string tableName)
         {
             return GetSchema(cxSource, tableName).Intersect(GetSchema(cxTarget, tableName), StringComparer.OrdinalIgnoreCase);
         }
 
-        private IEnumerable<string> GetSchema(SqlConnection connection, string tableName)
+        private IEnumerable<string> GetSchema(ServerConnection connection, string tableName)
         {
-            using (SqlCommand command = connection.CreateCommand())
+            using (var command = GetSqlCommand(connection, sqlTimeout))
             {
                 command.CommandText = @"SELECT sche.name AS schemaName, tab.name AS tableName, col.name AS colName,
                     ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0) AS is_computed
@@ -175,8 +164,6 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     AND ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'IsComputed'),0)=0 --exclude computed columns
                     AND ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'GeneratedAlwaysType'),0)=0 --exclude generated columns
                     ORDER BY sche.name,tab.name,col.column_id";
-                command.CommandTimeout = sqlTimeout;
-                command.CommandType = CommandType.Text;
                 var tablesplit = tableName.Split('.');
                 command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
                 command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
@@ -192,22 +179,55 @@ namespace Sql2SqlCloner.Core.DataTransfer
             }
         }
 
-        private string GetMasterHistoryTable(SqlConnection connection, string tableName)
+        private IDictionary<string, string> GetUniqueColumns(ServerConnection connection, string tableName)
+        {
+            using (var command = GetSqlCommand(connection, sqlTimeout))
+            {
+                command.CommandText = @"SELECT c.[name] AS constraint_name, SUBSTRING(column_names, 1, len(column_names)-1) AS constraint_columns
+                FROM sys.objects t LEFT OUTER JOIN sys.indexes i ON t.object_id=i.object_id
+                    LEFT OUTER JOIN sys.key_constraints c ON i.object_id=c.parent_object_id AND i.index_id=c.unique_index_id
+                    CROSS APPLY (SELECT col.[name] + ','
+                                    FROM sys.index_columns ic
+                                    INNER JOIN sys.columns col ON ic.object_id=col.object_id AND ic.column_id=col.column_id
+                                    WHERE ic.object_id=t.object_id AND ic.index_id=i.index_id
+                                    ORDER BY col.column_id
+                                    FOR XML PATH ('')) D (column_names)
+                WHERE is_unique=1 AND t.is_ms_shipped<>1
+                AND QUOTENAME(schema_name(t.schema_id)) + '.' + QUOTENAME(t.[name])='" + tableName + "'";
+                var lst = new Dictionary<string, string>();
+                using (var reader = command.ExecuteReader())
+                {
+                    int rowcount = 0;
+                    while (reader.Read())
+                    {
+                        rowcount++;
+                        var key = (reader["constraint_name"] == DBNull.Value) ? ("null" + rowcount) : (string)reader["constraint_name"];
+                        while (lst.ContainsKey(key))
+                        {
+                            key += "x";
+                        }
+                        var value = (string)reader["constraint_columns"];
+                        lst.Add(key, value);
+                    }
+                }
+                return lst;
+            }
+        }
+
+        private string GetMasterHistoryTable(ServerConnection connection, string tableName)
         {
             if (dbSource.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version) && dbDestination.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
             {
-                using (SqlCommand command = connection.CreateCommand())
+                using (var command = GetSqlCommand(connection, sqlTimeout))
                 {
                     command.CommandText = @"SELECT QUOTENAME(sche.name) + '.' + QUOTENAME(tab.name) AS MasterHistoryTable
                         FROM (sys.tables tab INNER JOIN sys.schemas sche ON sche.schema_id=tab.schema_id)
-                        WHERE history_table_id =
+                        WHERE history_table_id=
                         (
                             SELECT object_id
                             FROM (sys.tables tab INNER JOIN sys.schemas sche ON sche.schema_id=tab.schema_id)
                             WHERE sche.name=@schema AND tab.name=@table
                         )";
-                    command.CommandTimeout = sqlTimeout;
-                    command.CommandType = CommandType.Text;
                     var tablesplit = tableName.Split('.');
                     command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
                     command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
@@ -223,9 +243,10 @@ namespace Sql2SqlCloner.Core.DataTransfer
             return null;
         }
 
-        public bool TransferData(string table, string query)
+        public bool TransferData(string tableName, string query)
         {
             SqlDataReader reader = null;
+            var strDropIndex = new List<string>();
             try
             {
                 if (BulkCopy == null)
@@ -234,7 +255,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     {
                         batchSize = 5000;
                     }
-                    BulkCopy = new SqlBulkCopy(destinationConnectionString, SqlBulkCopyOptions.KeepIdentity)
+                    BulkCopy = new SqlBulkCopy(DestinationConnectionString, SqlBulkCopyOptions.KeepIdentity)
                     {
                         BatchSize = batchSize,
                         NotifyAfter = batchSize * 2,
@@ -242,34 +263,54 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     };
                 }
 
-                var masterhistorytable = GetMasterHistoryTable(DestinationConnection.SqlConnectionObject, table);
-                if (!string.IsNullOrEmpty(masterhistorytable))
+                if (Properties.Settings.Default.IncrementalDataCopy)
                 {
-                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = OFF)", DestinationConnection.SqlConnectionObject)
+                    var uniqueColumns = GetUniqueColumns(destinationConnection, tableName);
+                    if (uniqueColumns.Any())
                     {
-                        CommandTimeout = sqlTimeout
-                    }.ExecuteNonQuery();
+                        using (var command = GetDestinationSqlCommand(sqlTimeout))
+                        {
+                            foreach (var uqIndex in uniqueColumns)
+                            {
+                                //create a temporary name
+                                var indexname = "index" + DateTime.Now.Ticks + "TMP" + Math.Abs(uqIndex.GetHashCode() % 10000);
+                                var sqlCreateIndex = $"CREATE UNIQUE NONCLUSTERED INDEX {indexname} ON {tableName} ({uqIndex.Value}" +
+                                     ") WITH(PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = ON, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]";
+                                command.CommandText = sqlCreateIndex;
+                                command.ExecuteNonQuery();
+                                strDropIndex.Add($"DROP INDEX {indexname} ON {tableName}");
+                            }
+                        }
+                    }
                 }
 
-                BulkCopy.DestinationTableName = table;
+                var masterhistorytable = GetMasterHistoryTable(DestinationConnection, tableName);
+                if (!string.IsNullOrEmpty(masterhistorytable))
+                {
+                    using (var command = GetDestinationSqlCommand(sqlTimeout, $"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = OFF)"))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+                }
+
+                BulkCopy.DestinationTableName = tableName;
                 BulkCopy.ColumnMappings.Clear();
-                GetMapping(SourceConnection.SqlConnectionObject, DestinationConnection.SqlConnectionObject, table).ToList().
+                GetMapping(SourceConnection, DestinationConnection, tableName).ToList().
                     ForEach(columnName => BulkCopy.ColumnMappings.Add(new SqlBulkCopyColumnMapping(columnName, columnName)));
 
-                using (SqlCommand myCommand = new SqlCommand(query, SourceConnection.SqlConnectionObject))
+                using (var command = GetSourceSqlCommand(sqlTimeout, query))
                 {
-                    myCommand.CommandTimeout = sqlTimeout;
-                    reader = myCommand.ExecuteReader();
+                    reader = command.ExecuteReader();
                     BulkCopy.WriteToServer(reader);
                     reader.Close();
                 }
 
                 if (!string.IsNullOrEmpty(masterhistorytable))
                 {
-                    new SqlCommand($"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING = ON (HISTORY_TABLE = {table}, DATA_CONSISTENCY_CHECK = ON))", DestinationConnection.SqlConnectionObject)
+                    using (var command = GetDestinationSqlCommand(sqlTimeout, $"ALTER TABLE {masterhistorytable} SET(SYSTEM_VERSIONING=ON (HISTORY_TABLE = {tableName}, DATA_CONSISTENCY_CHECK=ON))"))
                     {
-                        CommandTimeout = sqlTimeout
-                    }.ExecuteNonQuery();
+                        command.ExecuteNonQuery();
+                    }
                 }
                 return true;
             }
@@ -284,6 +325,22 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 {
                     reader.Close();
                 }
+
+                try
+                {
+                    if (strDropIndex.Any())
+                    {
+                        using (var command = GetDestinationSqlCommand(sqlTimeout))
+                        {
+                            strDropIndex.ForEach(strDrop =>
+                            {
+                                command.CommandText = strDrop;
+                                command.ExecuteNonQuery();
+                            });
+                        }
+                    }
+                }
+                catch { }
             }
         }
     }

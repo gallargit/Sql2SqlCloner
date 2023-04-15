@@ -11,24 +11,28 @@ namespace Sql2SqlCloner.Core
 {
     public class SqlTransfer
     {
+        public readonly string SourceConnectionString;
+        public readonly string DestinationConnectionString;
+
         protected ServerConnection sourceConnection;
         protected ServerConnection destinationConnection;
         protected readonly Database dbSource;
         protected readonly Database dbDestination;
-        protected readonly string sourceConnectionString;
-        protected readonly string destinationConnectionString;
         protected readonly int sqlTimeout;
+
+        private bool SourceSqlCommandDisposed = true;
+        private bool DestinationSqlCommandDisposed = true;
 
         public IList<string> LstPostExecutionExecute { get; } = new List<string>();
 
         public SqlTransfer(string src, string dest, IList<string> lstPostExecutionExecute)
         {
-            sourceConnectionString = src;
-            destinationConnectionString = dest;
+            SourceConnectionString = src;
+            DestinationConnectionString = dest;
             sourceConnection = new ServerConnection(new SqlConnection(src));
             destinationConnection = new ServerConnection(new SqlConnection(dest));
-            dbSource = new Server(SourceConnection).Databases[SourceConnection.DatabaseName];
-            dbDestination = new Server(DestinationConnection).Databases[DestinationConnection.DatabaseName];
+            dbSource = new Server(SourceConnection).Databases[SourceDatabaseName];
+            dbDestination = new Server(DestinationConnection).Databases[DestinationDatabaseName];
 
             if (!int.TryParse(ConfigurationManager.AppSettings["SqlTimeout"], out sqlTimeout))
             {
@@ -37,7 +41,7 @@ namespace Sql2SqlCloner.Core
             lstPostExecutionExecute?.ToList().ForEach(item => LstPostExecutionExecute.Add(item));
         }
 
-        public ServerConnection SourceConnection
+        protected ServerConnection SourceConnection
         {
             get
             {
@@ -56,7 +60,7 @@ namespace Sql2SqlCloner.Core
             }
         }
 
-        public ServerConnection DestinationConnection
+        protected ServerConnection DestinationConnection
         {
             get
             {
@@ -75,21 +79,32 @@ namespace Sql2SqlCloner.Core
             }
         }
 
+        public string SourceDatabaseName
+        {
+            get
+            {
+                return SourceConnection.DatabaseName;
+            }
+        }
+
+        public string DestinationDatabaseName
+        {
+            get
+            {
+                return DestinationConnection.DatabaseName;
+            }
+        }
+
         protected void CopyToDestination(string sql)
         {
-            using (SqlCommand commandSource = SourceConnection.SqlConnectionObject.CreateCommand())
+            using (var commandSource = GetSourceSqlCommand(sqlTimeout, sql))
             {
-                commandSource.CommandText = sql;
-                commandSource.CommandType = CommandType.Text;
-                commandSource.CommandTimeout = sqlTimeout;
                 using (var reader = commandSource.ExecuteReader())
                 {
                     try
                     {
-                        using (SqlCommand commandDestination = DestinationConnection.SqlConnectionObject.CreateCommand())
+                        using (var commandDestination = GetDestinationSqlCommand(sqlTimeout))
                         {
-                            commandDestination.CommandType = CommandType.Text;
-                            commandDestination.CommandTimeout = sqlTimeout;
                             while (reader.Read())
                             {
                                 try
@@ -109,25 +124,18 @@ namespace Sql2SqlCloner.Core
         public void RunInDestination(string sql)
         {
             var lstToRun = new List<string>();
-            using (SqlCommand commandSource = DestinationConnection.SqlConnectionObject.CreateCommand())
+            using (var commandSource = GetDestinationSqlCommand(sqlTimeout, sql))
+            using (var reader = commandSource.ExecuteReader())
             {
-                commandSource.CommandText = sql;
-                commandSource.CommandType = CommandType.Text;
-                commandSource.CommandTimeout = sqlTimeout;
-                using (var reader = commandSource.ExecuteReader())
+                while (reader.Read())
                 {
-                    while (reader.Read())
-                    {
-                        lstToRun.Add((string)reader[0]);
-                    }
+                    lstToRun.Add((string)reader[0]);
                 }
             }
             if (lstToRun.Count > 0)
             {
-                using (SqlCommand commandDestination = DestinationConnection.SqlConnectionObject.CreateCommand())
+                using (var commandDestination = GetDestinationSqlCommand(sqlTimeout))
                 {
-                    commandDestination.CommandType = CommandType.Text;
-                    commandDestination.CommandTimeout = sqlTimeout;
                     lstToRun.ForEach(item =>
                     {
                         try
@@ -143,12 +151,8 @@ namespace Sql2SqlCloner.Core
 
         public void EnableDestinationConstraints()
         {
-            using (SqlCommand command = new SqlCommand())
+            using (var command = GetDestinationSqlCommand(0)) //no timeout for enabling checks
             {
-                command.Connection = DestinationConnection.SqlConnectionObject;
-                command.CommandType = CommandType.Text;
-                command.CommandTimeout = 0; //no timeout for enabling checks
-
                 command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL'";
                 command.ExecuteNonQuery();
 
@@ -164,12 +168,8 @@ namespace Sql2SqlCloner.Core
 
         public void DeleteDestinationDatabase()
         {
-            using (SqlCommand command = new SqlCommand())
+            using (var command = GetDestinationSqlCommand(0)) //no timeout for deleting
             {
-                command.Connection = DestinationConnection.SqlConnectionObject;
-                command.CommandType = CommandType.Text;
-                command.CommandTimeout = 0; //no timeout for deleting
-
                 if (dbDestination.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
                 {
                     command.CommandText = "EXEC sp_MSforeachtable @command1='SET QUOTED_IDENTIFIER ON; DELETE FROM ?', @whereand='AND o.id NOT IN (SELECT history_table_id FROM sys.tables WHERE temporal_type=2)'";
@@ -207,8 +207,7 @@ namespace Sql2SqlCloner.Core
                     FROM sys.triggers WHERE parent_class_desc='DATABASE' AND is_disabled=1
                 UNION
                 SELECT 'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' + QUOTENAME(Object_Name(sys.foreign_keys.parent_object_id)) + ' NOCHECK CONSTRAINT ' + QUOTENAME(sys.foreign_keys.name)
-                    FROM sys.foreign_keys INNER JOIN sys.tables ON sys.foreign_keys.parent_object_id=sys.tables.object_id WHERE is_disabled=1 OR is_not_trusted=1
-            ");
+                    FROM sys.foreign_keys INNER JOIN sys.tables ON sys.foreign_keys.parent_object_id=sys.tables.object_id WHERE is_disabled=1 OR is_not_trusted=1");
             //re-enable the "enabled-nocheck" items
             CopyToDestination(@"SELECT 'ALTER TABLE ' + QUOTENAME(schema_name(tab.schema_id)) + '.' + QUOTENAME(tab.name) + ' CHECK CONSTRAINT ' + QUOTENAME(i.name)
                     FROM sys.check_constraints i INNER JOIN sys.objects tab ON i.parent_object_id=tab.object_id
@@ -220,23 +219,79 @@ namespace Sql2SqlCloner.Core
                     SELECT 'ENABLE TRIGGER ' + QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' +  QUOTENAME(sys.triggers.name) + ' ON ' +
                     QUOTENAME(SCHEMA_NAME(sys.tables.schema_id)) + '.' + QUOTENAME(sys.tables.name)
                     FROM sys.triggers INNER JOIN sys.tables ON sys.triggers.parent_id=sys.tables.object_id
-                    WHERE is_disabled=0
-            ");
+                    WHERE is_disabled=0");
         }
 
         public void DisableAllDestinationConstraints()
         {
             RunInDestination("SELECT 'DISABLE TRIGGER ' + QUOTENAME(name) + ' ON DATABASE' FROM sys.triggers WHERE parent_class_desc='DATABASE'");
-            using (SqlCommand command = new SqlCommand())
+            using (var command = GetDestinationSqlCommand(0)) //no timeout for trigger disable
             {
-                command.Connection = DestinationConnection.SqlConnectionObject;
-                command.CommandTimeout = 0;
-
                 command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL'";
                 command.ExecuteNonQuery();
 
                 command.CommandText = "EXEC sp_MSforeachtable 'ALTER TABLE ? DISABLE TRIGGER ALL'";
                 command.ExecuteNonQuery();
+            }
+        }
+
+        private SqlCommand CreateSqlCommand(SqlConnection sqlConnectionObject, EventHandler disposedEvent, int? timeout = null, string sql = null)
+        {
+            var sqlCommand = new SqlCommand()
+            {
+                Connection = sqlConnectionObject,
+                CommandType = CommandType.Text,
+                CommandTimeout = timeout ?? sqlTimeout
+            };
+            if (!string.IsNullOrEmpty(sql))
+            {
+                sqlCommand.CommandText = sql;
+            }
+
+            sqlCommand.Disposed += disposedEvent;
+
+            return sqlCommand;
+        }
+
+        public SqlCommand GetSourceSqlCommand(int? timeout, string sql = null)
+        {
+            if (!SourceSqlCommandDisposed)
+            {
+                throw new Exception("Fatal error, source command is still active");
+            }
+
+            SourceSqlCommandDisposed = false;
+
+            return CreateSqlCommand(SourceConnection.SqlConnectionObject,
+                (object sender, EventArgs e) => SourceSqlCommandDisposed = true, timeout, sql);
+        }
+
+        public SqlCommand GetDestinationSqlCommand(int? timeout, string sql = null)
+        {
+            if (!DestinationSqlCommandDisposed)
+            {
+                throw new Exception("Fatal error, destination command is still active");
+            }
+
+            DestinationSqlCommandDisposed = false;
+
+            return CreateSqlCommand(DestinationConnection.SqlConnectionObject,
+                (object sender, EventArgs e) => DestinationSqlCommandDisposed = true, timeout, sql);
+        }
+
+        public SqlCommand GetSqlCommand(ServerConnection cx, int? timeout, string sql = null)
+        {
+            if (cx == SourceConnection)
+            {
+                return GetSourceSqlCommand(timeout, sql);
+            }
+            else if (cx == DestinationConnection)
+            {
+                return GetDestinationSqlCommand(timeout, sql);
+            }
+            else
+            {
+                throw new Exception("Wrong connection " + cx.SqlConnectionObject.ToString());
             }
         }
     }

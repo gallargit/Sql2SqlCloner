@@ -54,7 +54,7 @@ namespace Sql2SqlCloner.Core
 
         public static bool GetTableProperty(this Table t, string propertyName)
         {
-            int retries = 4;
+            int retries = 3;
             var lasterror = "";
             while (retries > 0)
             {
@@ -86,7 +86,7 @@ namespace Sql2SqlCloner.Core
                         {
                             retries--;
                             lasterror = ex.InnerException.Message;
-                            Thread.Sleep(200);
+                            Thread.Sleep(200 + (DateTime.Now.Millisecond % 100));
                         }
                         else
                         {

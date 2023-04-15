@@ -14,7 +14,7 @@ namespace Sql2SqlCloner.Components
         private readonly Label label = new Label();
         private readonly TextBox textBox = new TextBox();
 
-        public InputBoxValidate(string title, string promptText, bool validateLong = false, Icon icon = null)
+        public InputBoxValidate(string title, string promptText, bool validateLong = false, bool hideChars = false, Icon icon = null)
         {
             if (icon != null)
             {
@@ -24,8 +24,13 @@ namespace Sql2SqlCloner.Components
             Text = title;
             label.Text = promptText;
 
-            buttonOk.Text = "OK";
-            buttonCancel.Text = "Cancel";
+            if (hideChars)
+            {
+                textBox.PasswordChar = '*';
+            }
+
+            buttonOk.Text = nameof(DialogResult.OK);
+            buttonCancel.Text = nameof(DialogResult.Cancel);
             buttonOk.DialogResult = DialogResult.OK;
             buttonCancel.DialogResult = DialogResult.Cancel;
 

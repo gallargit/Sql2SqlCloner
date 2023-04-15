@@ -40,52 +40,48 @@
             this.isData = new System.Windows.Forms.CheckBox();
             this.lblPleaseWait = new System.Windows.Forms.Label();
             this.trustServerCertificates = new System.Windows.Forms.CheckBox();
+            this.decryptObjects = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // txtSource
             // 
-            this.txtSource.Location = new System.Drawing.Point(16, 75);
-            this.txtSource.Margin = new System.Windows.Forms.Padding(4);
+            this.txtSource.Location = new System.Drawing.Point(12, 61);
             this.txtSource.Name = "txtSource";
-            this.txtSource.Size = new System.Drawing.Size(573, 22);
+            this.txtSource.Size = new System.Drawing.Size(431, 20);
             this.txtSource.TabIndex = 1;
             this.txtSource.TextChanged += new System.EventHandler(this.txtSource_TextChanged);
             // 
             // txtDestination
             // 
-            this.txtDestination.Location = new System.Drawing.Point(16, 138);
-            this.txtDestination.Margin = new System.Windows.Forms.Padding(4);
+            this.txtDestination.Location = new System.Drawing.Point(12, 112);
             this.txtDestination.Name = "txtDestination";
-            this.txtDestination.Size = new System.Drawing.Size(573, 22);
+            this.txtDestination.Size = new System.Drawing.Size(431, 20);
             this.txtDestination.TabIndex = 3;
             this.txtDestination.TextChanged += new System.EventHandler(this.txtDestination_TextChanged);
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(16, 55);
-            this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label1.Location = new System.Drawing.Point(12, 45);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(157, 16);
+            this.label1.Size = new System.Drawing.Size(128, 13);
             this.label1.TabIndex = 3;
             this.label1.Text = "Source Connection String";
             // 
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(16, 118);
-            this.label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label2.Location = new System.Drawing.Point(12, 96);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(181, 16);
+            this.label2.Size = new System.Drawing.Size(147, 13);
             this.label2.TabIndex = 4;
             this.label2.Text = "Destination Connection String";
             // 
             // btnSource
             // 
-            this.btnSource.Location = new System.Drawing.Point(600, 73);
-            this.btnSource.Margin = new System.Windows.Forms.Padding(4);
+            this.btnSource.Location = new System.Drawing.Point(450, 59);
             this.btnSource.Name = "btnSource";
-            this.btnSource.Size = new System.Drawing.Size(100, 28);
+            this.btnSource.Size = new System.Drawing.Size(75, 23);
             this.btnSource.TabIndex = 2;
             this.btnSource.Text = "Choose";
             this.btnSource.UseVisualStyleBackColor = true;
@@ -93,10 +89,9 @@
             // 
             // btnDestination
             // 
-            this.btnDestination.Location = new System.Drawing.Point(599, 134);
-            this.btnDestination.Margin = new System.Windows.Forms.Padding(4);
+            this.btnDestination.Location = new System.Drawing.Point(449, 109);
             this.btnDestination.Name = "btnDestination";
-            this.btnDestination.Size = new System.Drawing.Size(100, 28);
+            this.btnDestination.Size = new System.Drawing.Size(75, 23);
             this.btnDestination.TabIndex = 4;
             this.btnDestination.Text = "Choose";
             this.btnDestination.UseVisualStyleBackColor = true;
@@ -104,10 +99,9 @@
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(599, 268);
-            this.btnCancel.Margin = new System.Windows.Forms.Padding(4);
+            this.btnCancel.Location = new System.Drawing.Point(449, 218);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(100, 28);
+            this.btnCancel.Size = new System.Drawing.Size(75, 23);
             this.btnCancel.TabIndex = 10;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
@@ -115,10 +109,9 @@
             // 
             // btnNext
             // 
-            this.btnNext.Location = new System.Drawing.Point(491, 268);
-            this.btnNext.Margin = new System.Windows.Forms.Padding(4);
+            this.btnNext.Location = new System.Drawing.Point(368, 218);
             this.btnNext.Name = "btnNext";
-            this.btnNext.Size = new System.Drawing.Size(100, 28);
+            this.btnNext.Size = new System.Drawing.Size(75, 23);
             this.btnNext.TabIndex = 9;
             this.btnNext.Text = "Next";
             this.btnNext.UseVisualStyleBackColor = true;
@@ -129,10 +122,9 @@
             this.isSchema.AutoSize = true;
             this.isSchema.Checked = true;
             this.isSchema.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.isSchema.Location = new System.Drawing.Point(20, 188);
-            this.isSchema.Margin = new System.Windows.Forms.Padding(4);
+            this.isSchema.Location = new System.Drawing.Point(15, 153);
             this.isSchema.Name = "isSchema";
-            this.isSchema.Size = new System.Drawing.Size(114, 20);
+            this.isSchema.Size = new System.Drawing.Size(92, 17);
             this.isSchema.TabIndex = 5;
             this.isSchema.Text = "Copy Schema";
             this.isSchema.UseVisualStyleBackColor = true;
@@ -142,10 +134,9 @@
             this.isData.AutoSize = true;
             this.isData.Checked = true;
             this.isData.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.isData.Location = new System.Drawing.Point(172, 188);
-            this.isData.Margin = new System.Windows.Forms.Padding(4);
+            this.isData.Location = new System.Drawing.Point(129, 153);
             this.isData.Name = "isData";
-            this.isData.Size = new System.Drawing.Size(93, 20);
+            this.isData.Size = new System.Drawing.Size(76, 17);
             this.isData.TabIndex = 6;
             this.isData.Text = "Copy Data";
             this.isData.UseVisualStyleBackColor = true;
@@ -155,11 +146,10 @@
             this.lblPleaseWait.AutoSize = true;
             this.lblPleaseWait.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblPleaseWait.ForeColor = System.Drawing.SystemColors.Highlight;
-            this.lblPleaseWait.Location = new System.Drawing.Point(235, 233);
-            this.lblPleaseWait.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblPleaseWait.Location = new System.Drawing.Point(164, 196);
             this.lblPleaseWait.Name = "lblPleaseWait";
-            this.lblPleaseWait.Size = new System.Drawing.Size(146, 25);
-            this.lblPleaseWait.TabIndex = 8;
+            this.lblPleaseWait.Size = new System.Drawing.Size(119, 20);
+            this.lblPleaseWait.TabIndex = 11;
             this.lblPleaseWait.Text = "Please Wait...";
             this.lblPleaseWait.Visible = false;
             // 
@@ -168,19 +158,31 @@
             this.trustServerCertificates.AutoSize = true;
             this.trustServerCertificates.Checked = true;
             this.trustServerCertificates.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.trustServerCertificates.Location = new System.Drawing.Point(456, 188);
-            this.trustServerCertificates.Margin = new System.Windows.Forms.Padding(4);
+            this.trustServerCertificates.Location = new System.Drawing.Point(325, 153);
             this.trustServerCertificates.Name = "trustServerCertificates";
-            this.trustServerCertificates.Size = new System.Drawing.Size(207, 20);
+            this.trustServerCertificates.Size = new System.Drawing.Size(168, 17);
             this.trustServerCertificates.TabIndex = 7;
             this.trustServerCertificates.Text = "Always trust server certificates";
             this.trustServerCertificates.UseVisualStyleBackColor = true;
             // 
+            // decryptObjects
+            // 
+            this.decryptObjects.AutoSize = true;
+            this.decryptObjects.Checked = true;
+            this.decryptObjects.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.decryptObjects.Location = new System.Drawing.Point(325, 176);
+            this.decryptObjects.Name = "decryptObjects";
+            this.decryptObjects.Size = new System.Drawing.Size(209, 17);
+            this.decryptObjects.TabIndex = 8;
+            this.decryptObjects.Text = "Decrypt objects using DAC connection";
+            this.decryptObjects.UseVisualStyleBackColor = true;
+            // 
             // ChooseConnections
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(728, 321);
+            this.ClientSize = new System.Drawing.Size(546, 261);
+            this.Controls.Add(this.decryptObjects);
             this.Controls.Add(this.trustServerCertificates);
             this.Controls.Add(this.lblPleaseWait);
             this.Controls.Add(this.isData);
@@ -193,7 +195,6 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.txtDestination);
             this.Controls.Add(this.txtSource);
-            this.Margin = new System.Windows.Forms.Padding(4);
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "ChooseConnections";
@@ -220,5 +221,6 @@
         private System.Windows.Forms.CheckBox isData;
         private System.Windows.Forms.Label lblPleaseWait;
         private System.Windows.Forms.CheckBox trustServerCertificates;
+        private System.Windows.Forms.CheckBox decryptObjects;
     }
 }

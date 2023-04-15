@@ -279,5 +279,35 @@ namespace Sql2SqlCloner.Properties
                 this["AlwaysTrustServerCertificates"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DecryptObjects
+        {
+            get
+            {
+                return ((bool)(this["DecryptObjects"]));
+            }
+            set
+            {
+                this["DecryptObjects"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool IncrementalDataCopy
+        {
+            get
+            {
+                return ((bool)(this["IncrementalDataCopy"]));
+            }
+            set
+            {
+                this["IncrementalDataCopy"] = value;
+            }
+        }
     }
 }

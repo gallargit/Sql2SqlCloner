@@ -48,9 +48,13 @@ These two DLLs should be copied at build time, according to these two lines in t
 
 My guess is that the first time they are not copied because the packages have not been downloaded yet, and I could not figure out a way to force package download. If you first build; then rebuild the project, they will be copied and everything will work. But since this is annoying and inconvenient a quick workaround has been made in the `Loader.cs` file. If the DLLs are not present, they will be copied at runtime from the `packages` folder.
 
-- Package Microsoft.Data.SqlClient.SNI 5.1.0 breaks compatibility with SQL Server 2005, hence it has not been upgraded
+- Packages Microsoft.Data.SqlClient and Microsoft.Data.SqlClient.SNI 5.1.0 break compatibility with SQL Server 2005, hence they will not be upgraded
+
+# New Experimental Features
+* Ability to decrypt encrypted objects using DAC connection. Triggers and functions do not work.
+* Multithreaded schema processing.
+* Incremental data copy (available when copying data only)
 
 # To be done
-* Ability to decrypt encrypted objects using DAC connection
 * Copy Azure databases using Azure Multi Factor Authentication as seen [here](https://stackoverflow.com/questions/60564462/how-to-connect-to-a-database-using-active-directory-login-and-multifactor-authen)
 * Decrypt and re-encrypt columns as seen here https://learn.microsoft.com/en-us/sql/t-sql/functions/decryptbykey-transact-sql?view=sql-server-ver16

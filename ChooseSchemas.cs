@@ -260,7 +260,7 @@ namespace Sql2SqlCloner
         private void MenuTop_Click(object sender, EventArgs e)
         {
             string defaultValue = CurrentTable.TopRecords.ToString();
-            if (new InputBoxValidate("Top records", "Enter top records to retrieve (0 for all)", true, Icon)
+            if (new InputBoxValidate("Top records", "Enter top records to retrieve (0 for all)", true, icon: Icon)
                     .ShowDialog(ref defaultValue) == DialogResult.OK)
             {
                 CurrentTable.TopRecords = long.Parse(defaultValue);
@@ -281,7 +281,7 @@ namespace Sql2SqlCloner
         private void MenuWhere_Click(object sender, EventArgs e)
         {
             string defaultValue = CurrentTable.WhereFilter;
-            if (new InputBoxValidate("Filter records", "Enter where clause to filter by (empty for all)", false, Icon)
+            if (new InputBoxValidate("Filter records", "Enter where clause to filter by (empty for all)", false, icon: Icon)
                     .ShowDialog(ref defaultValue) == DialogResult.OK)
             {
                 if (string.IsNullOrWhiteSpace(defaultValue))
@@ -378,16 +378,13 @@ namespace Sql2SqlCloner
                         {
                             checkedItems.Add((item.Nodes[0].Tag as SqlSchemaTable)?.Name);
                         }
+                        else if (item.Tag != null && item.Tag is SqlSchemaTable)
+                        {
+                            checkedItems.Add((item.Tag as SqlSchemaTable)?.Name);
+                        }
                         else
                         {
-                            if (item.Tag != null && item.Tag is SqlSchemaTable)
-                            {
-                                checkedItems.Add((item.Tag as SqlSchemaTable)?.Name);
-                            }
-                            else
-                            {
-                                checkedItems.Add(item.Text);
-                            }
+                            checkedItems.Add(item.Text);
                         }
                         if (item.Parent.Text == "Table" && (SelectOnlyTables || (item.Nodes.Count > 0 && item.Nodes[0].Checked)))
                         {
@@ -431,6 +428,14 @@ namespace Sql2SqlCloner
                 DialogResult = DialogResult.OK;
                 Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
                 Properties.Settings.Default.DeleteDestinationTables = deleteDestinationTables.Checked;
+                if (Properties.Settings.Default.DeleteDestinationTables)
+                {
+                    Properties.Settings.Default.IncrementalDataCopy = false;
+                }
+                else
+                {
+                    Properties.Settings.Default.IncrementalDataCopy = incrementalDataCopy.Checked;
+                }
                 Properties.Settings.Default.Save();
             }
             else
@@ -471,7 +476,7 @@ namespace Sql2SqlCloner
         private void btnSelectSchema_Click(object sender, EventArgs e)
         {
             var defaultValue = "";
-            if (new InputBoxValidate("Schemas", "Enter schema names (separated by \",\" if more than one)", false, Icon)
+            if (new InputBoxValidate("Schemas", "Enter schema names (separated by \",\" if more than one)", false, icon: Icon)
                     .ShowDialog(ref defaultValue) == DialogResult.OK)
             {
                 foreach (var node in treeView1.Nodes)
@@ -519,6 +524,8 @@ namespace Sql2SqlCloner
             copyCollation.SelectedIndex = (int)Properties.Settings.Default.CopyCollation;
             disableNotForReplication.Checked = Properties.Settings.Default.DisableNotForReplication;
             ignoreFileGroup.Checked = Properties.Settings.Default.IgnoreFileGroup;
+            incrementalDataCopy.Checked = Properties.Settings.Default.IncrementalDataCopy;
+            incrementalDataCopy.Enabled = !deleteDestinationTables.Checked;
 
             if (AutoRun)
             {
@@ -529,6 +536,11 @@ namespace Sql2SqlCloner
         private void copyConstraints_CheckedChanged(object sender, EventArgs e)
         {
             copyFullText.Enabled = copyConstraints.Checked;
+        }
+
+        private void deleteDestinationTables_CheckedChanged(object sender, EventArgs e)
+        {
+            incrementalDataCopy.Enabled = !deleteDestinationTables.Checked;
         }
     }
 }

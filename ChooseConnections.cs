@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.ConnectionUI;
+using Sql2SqlCloner.Components;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
@@ -117,6 +118,7 @@ namespace Sql2SqlCloner
             isSchema.Checked = Properties.Settings.Default.CopySchema;
             isData.Checked = Properties.Settings.Default.CopyData;
             trustServerCertificates.Checked = Properties.Settings.Default.AlwaysTrustServerCertificates;
+            decryptObjects.Checked = Properties.Settings.Default.DecryptObjects;
 
             if (sender != null && e != null && AutoRun)
             {
@@ -129,7 +131,7 @@ namespace Sql2SqlCloner
                 {
                     EnablePreload = false;
                     strtskSource = strtskDestination = destinationConnection;
-                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, cancelToken), cancelToken);
+                    tskPreload = Task.Run(() => new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, null, cancelToken), cancelToken);
                 }
             }
         }
@@ -205,11 +207,53 @@ namespace Sql2SqlCloner
                     destinationConnection += "Trust Server Certificate=True";
                 }
             }
+
+            string DACConnectionString = null;
+            if (Properties.Settings.Default.DecryptObjects)
+            {
+                var builder = new DbConnectionStringBuilder
+                {
+                    ConnectionString = sourceConnection
+                };
+                if (!builder.TryGetValue("Initial Catalog", out object objField))
+                {
+                    throw new Exception("DAC Database not found");
+                }
+                var DACDATABASE = objField.ToString();
+                if (!builder.TryGetValue("Data Source", out objField))
+                {
+                    throw new Exception("DAC Host not found");
+                }
+                string DACHOST = objField.ToString();
+
+                var DACUSER = "sa";
+                var DACPASSWORD = "";
+                if (builder.TryGetValue("User Id", out objField) &&
+                    objField.ToString() == DACUSER &&
+                    builder.TryGetValue("Password", out objField))
+                {
+                    DACPASSWORD = objField.ToString();
+                }
+                if (string.IsNullOrEmpty(DACPASSWORD))
+                {
+                    new InputBoxValidate("Enter password", "Please enter 'sa' password", hideChars: true).ShowDialog(ref DACPASSWORD);
+                    if (string.IsNullOrEmpty(DACPASSWORD))
+                    {
+                        return;
+                    }
+                }
+
+                //if using DAC connection, preload should not be considered
+                AbortBackgroundTask();
+                strtskSource = null;
+                DACConnectionString = $"Packet Size=4096;User Id={DACUSER};Password={DACPASSWORD};Data Source=ADMIN:{DACHOST};Initial Catalog={DACDATABASE};Persist Security Info=True;TrustServerCertificate=true";
+            }
             Properties.Settings.Default.SourceServer = sourceConnection;
             Properties.Settings.Default.DestinationServer = destinationConnection;
             Properties.Settings.Default.CopySchema = isSchema.Checked;
             Properties.Settings.Default.CopyData = isData.Checked;
             Properties.Settings.Default.AlwaysTrustServerCertificates = trustServerCertificates.Checked;
+            Properties.Settings.Default.DecryptObjects = decryptObjects.Checked;
             Properties.Settings.Default.Save();
 
             var firststepok = false;
@@ -229,7 +273,7 @@ namespace Sql2SqlCloner
                 {
                     AbortBackgroundTask();
                     cancelToken = new CancellationToken();
-                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, cancelToken);
+                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, DACConnectionString, cancelToken);
                 }
                 strtskSource = strtskDestination = null;
                 tskPreload = null;
