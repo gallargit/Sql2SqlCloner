@@ -31,14 +31,14 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         private Database destinationDatabase;
         private readonly string DACconnection;
         private readonly Transfer transfer;
-        private readonly List<string> existingschemas = new List<string> { "dbo" };
+        private readonly IList<string> existingschemas = new List<string> { "dbo" };
         private readonly Dictionary<string, string> schemaauths = new Dictionary<string, string>();
         public CancellationToken CancelToken { get; private set; }
         public readonly bool SameDatabase;
 
-        public List<SqlSchemaObject> SourceObjects { get; set; }
-        public List<SqlSchemaObject> DestinationObjects { get; set; }
-        public List<SqlSchemaObject> RecreateObjects { get; } = new List<SqlSchemaObject>();
+        public IList<SqlSchemaObject> SourceObjects { get; set; }
+        public IList<SqlSchemaObject> DestinationObjects { get; set; }
+        public IList<SqlSchemaObject> RecreateObjects { get; } = new List<SqlSchemaObject>();
 
         public bool IncludePermissions
         {
@@ -626,10 +626,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 var triggerON = false;
                 var RaiserrorTransform = string.Equals(ConfigurationManager.AppSettings["RaiserrorTransform"], "true", StringComparison.InvariantCultureIgnoreCase);
                 if (RaiserrorTransform &&
-                   ((sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
-                       destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version)) ||
-                    (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
-                       !destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))))
+                   ((sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012) &&
+                       destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012)) ||
+                    (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012) &&
+                       !destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012))))
                 {
                     //both databases are SQL2012 or newer, or both are older than SQL2012, RAISERROR should not be transformed
                     RaiserrorTransform = false;
@@ -660,8 +660,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     //Experimental: enable RAISERROR transform from old format to new format
                     if (raiserrorON)
                     {
-                        if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
-                        destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+                        if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012) &&
+                        destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012))
                         {
                             //source is old, destination is new, apply new syntax
                             if (raiserrorTOKENS == null)
@@ -751,8 +751,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 }
                             }
                         }
-                        else if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
-                            destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+                        else if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012) &&
+                            destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012))
                         {
                             //source is old, destination is new, keep old sntax
                             sb.Append(strTokenTest);
@@ -1300,7 +1300,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 WHERE DP1.type='R' AND DP1.is_fixed_role=0 AND DP2.is_fixed_role=0");
         }
 
-        private List<SqlSchemaObject> GetSqlObjects(ServerConnection connection, Database db)
+        private IList<SqlSchemaObject> GetSqlObjects(ServerConnection connection, Database db)
         {
             var items = new List<SqlSchemaObject>();
 
@@ -1313,14 +1313,14 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
             }
 
-            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2008_Version))
+            if (db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2008))
             {
                 foreach (FullTextStopList item in db.FullTextStopLists)
                 {
                     items.Add(new SqlSchemaObject { Name = item.Name, Object = item, Type = item.GetType().Name });
                 }
             }
-            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version) &&
+            if (db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012) &&
                 !dbSource.IsAzureDatabase() &&
                 !dbDestination.IsAzureDatabase())
             {
@@ -1396,7 +1396,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
-            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2008_Version))
+            if (db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2008))
             {
                 foreach (UserDefinedTableType item in db.UserDefinedTableTypes)
                 {
@@ -1439,7 +1439,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 return items;
             }
 
-            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+            if (db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012))
             {
                 foreach (Sequence item in db.Sequences)
                 {
@@ -1522,7 +1522,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
 
-            if (db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
+            if (db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016))
             {
                 foreach (SecurityPolicy item in db.SecurityPolicies)
                 {
@@ -1715,8 +1715,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             index.GetType().GetProperty(property).SetValue(index, srcindex.GetType().GetProperty(property).GetValue(srcindex), null);
                         }
                     }
-                    if (sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version) &&
-                        destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
+                    if (sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016) &&
+                        destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016))
                     {
                         foreach (string property in new[] { "CompressAllRowGroups" })
                         {
@@ -1769,8 +1769,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         index.FileGroup = destinationDatabase.Tables[obj.Name].FileGroup;
                     }
 
-                    if ((sourceDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version) || sourceDatabase.IsAzureDatabase()) &&
-                        (destinationDatabase.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version) || destinationDatabase.IsAzureDatabase()) &&
+                    if ((sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016) || sourceDatabase.IsAzureDatabase()) &&
+                        (destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016) || destinationDatabase.IsAzureDatabase()) &&
                         srcindex.SpatialIndexType != SpatialIndexType.None)
                     {
                         index.BoundingBoxXMax = srcindex.BoundingBoxXMax;
@@ -2006,8 +2006,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 var destinations = new BlockingCollection<NamedSmoObject>();
                 var retrylist = new List<NamedSmoObject>();
-                DestinationObjects.ConvertAll(o => o.Object).Where(p => !(p is Schema))
-                   .Union(DestinationObjects.ConvertAll(s => s.Object))
+                DestinationObjects.Select(o => o.Object).Where(p => !(p is Schema))
+                   .Union(DestinationObjects.Select(s => s.Object))
                    .Where(nt => !(nt is Table) && !(nt is Trigger))
                    .ToList()
                    .ForEach(item => destinations.Add(item));
@@ -2063,7 +2063,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                     destinations.Add(table);
                                 }
                                 //place schemas at the end
-                                DestinationObjects.ConvertAll(o => o.Object).Where(p => p is Schema)
+                                DestinationObjects.Select(o => o.Object).Where(p => p is Schema)
                                                 .ToList()
                                                 .ForEach(item => destinations.Add(item));
                             }

@@ -181,9 +181,9 @@ namespace Sql2SqlCloner
             //Tables should be shown at the first position
             foreach (var currentitemtype in new List<string>() { "Table" }.Union(items.Select(i => i.Type).Distinct()))
             {
-                var child = root.Nodes.Add(currentitemtype);
-                child.Checked = true;
                 var itemsCurrent = items.Where(i => i.Type == currentitemtype).ToList();
+                var child = root.Nodes.Add(currentitemtype + $" ({itemsCurrent.Count})");
+                child.Checked = true;
                 if (sortByRecords && currentitemtype == "Table")
                 {
                     itemsCurrent = itemsCurrent.OfType<SqlSchemaTable>().OrderByDescending(t => t.RowCount).ThenBy(s => s.Name).OfType<SqlSchemaObject>().ToList();
@@ -193,7 +193,7 @@ namespace Sql2SqlCloner
                 {
                     tn = child.Nodes.Add(currentitem.Name);
                     tn.Checked = !CheckIfInList(currentitem.Name, excludeObjectsList);
-                    if (child.Text == "Table")
+                    if (child.Text.StartsWith("Table"))
                     {
                         var currenttable = currentitem as SqlSchemaTable;
                         WHERECONDITIONS.TryGetValue(tn.Text, out string WHERE);
@@ -386,7 +386,7 @@ namespace Sql2SqlCloner
                         {
                             checkedItems.Add(item.Text);
                         }
-                        if (item.Parent.Text == "Table" && (SelectOnlyTables || (item.Nodes.Count > 0 && item.Nodes[0].Checked)))
+                        if (item.Parent.Text.StartsWith("Table") && (SelectOnlyTables || (item.Nodes.Count > 0 && item.Nodes[0].Checked)))
                         {
                             //this table's data should be copied
                             if (item.Nodes.Count > 0)

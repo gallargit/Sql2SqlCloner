@@ -170,7 +170,7 @@ namespace Sql2SqlCloner.Core
         {
             using (var command = GetDestinationSqlCommand(0)) //no timeout for deleting
             {
-                if (dbDestination.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
+                if (dbDestination.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016))
                 {
                     command.CommandText = "EXEC sp_MSforeachtable @command1='SET QUOTED_IDENTIFIER ON; DELETE FROM ?', @whereand='AND o.id NOT IN (SELECT history_table_id FROM sys.tables WHERE temporal_type=2)'";
                 }

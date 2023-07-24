@@ -5,45 +5,36 @@ using System.Threading;
 
 namespace Sql2SqlCloner.Core
 {
-    public enum SQL_Versions
+    public enum SQL_DB_Compatibility
     {
-        SQL_2008_Version = 100,
-        SQL_2012_Version = 110,
-        SQL_2016_Version = 130
+        DB_2008 = 100,
+        DB_2012 = 110,
+        DB_2016 = 130
+    }
+
+    public enum SQL_Server_Major_Versions
+    {
+        SERVER_2008 = 10,
+        SERVER_2012 = 11,
+        SERVER_2016 = 13
     }
 
     public static class SmoExtensions
     {
-        public static bool IsRunningMinimumSQLVersion(this Database db, SQL_Versions version)
+        public static bool IsRunningMinimumSQLVersion(this Database db, SQL_DB_Compatibility version)
         {
-            if (version == SQL_Versions.SQL_2008_Version)
+            if (version == SQL_DB_Compatibility.DB_2008)
             {
-                var isRunningMinimumSQL2008 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-                if (!isRunningMinimumSQL2008)
-                {
-                    isRunningMinimumSQL2008 = (int)db.CompatibilityLevel >= (int)SQL_Versions.SQL_2008_Version;
-                }
-                return isRunningMinimumSQL2008;
+                return (int)db.CompatibilityLevel >= (int)SQL_DB_Compatibility.DB_2008 && db.ServerVersion.Major >= (int)SQL_Server_Major_Versions.SERVER_2008;
             }
-            else if (version == SQL_Versions.SQL_2012_Version)
+            else if (version == SQL_DB_Compatibility.DB_2012)
             {
-                var isRunningMinimumSQL2012 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-                if (!isRunningMinimumSQL2012)
-                {
-                    isRunningMinimumSQL2012 = (int)db.CompatibilityLevel >= (int)SQL_Versions.SQL_2012_Version;
-                }
-                return isRunningMinimumSQL2012;
+                return (int)db.CompatibilityLevel >= (int)SQL_DB_Compatibility.DB_2012 && db.ServerVersion.Major >= (int)SQL_Server_Major_Versions.SERVER_2012;
             }
-            else if (version == SQL_Versions.SQL_2016_Version)
+            else if (version == SQL_DB_Compatibility.DB_2016)
             {
-                var isRunningMinimumSQL2016 = db.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase;
-                if (!isRunningMinimumSQL2016)
-                {
-                    isRunningMinimumSQL2016 = (int)db.CompatibilityLevel >= (int)SQL_Versions.SQL_2016_Version;
-                }
-                return isRunningMinimumSQL2016;
+                return (int)db.CompatibilityLevel >= (int)SQL_DB_Compatibility.DB_2016 && db.ServerVersion.Major >= (int)SQL_Server_Major_Versions.SERVER_2016;
             }
-
             return false;
         }
 
@@ -62,12 +53,12 @@ namespace Sql2SqlCloner.Core
                 {
                     Database db = t.Parent;
 
-                    if (propertyName == nameof(t.ChangeTrackingEnabled) && !db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2012_Version))
+                    if (propertyName == nameof(t.ChangeTrackingEnabled) && !db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012))
                     {
                         return false;
                     }
                     else if ((propertyName == nameof(t.IsMemoryOptimized) || propertyName == nameof(t.IsSystemVersioned))
-                        && !db.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
+                        && !db.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016))
                     {
                         return false;
                     }

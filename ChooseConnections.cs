@@ -23,6 +23,7 @@ namespace Sql2SqlCloner
         private Task<SqlSchemaTransfer> tskPreload;
         private readonly CancellationTokenSource tokenSource = new CancellationTokenSource();
         private CancellationToken cancelToken;
+        private const string TrustServerCertificateDesc = "TrustServerCertificate";
 
         public ChooseConnections()
         {
@@ -70,10 +71,10 @@ namespace Sql2SqlCloner
                     ConnectionString = connectionString
                 };
                 //"Trust Server Certificate" is not supported by Connection Dialog
-                if (builder.ContainsKey("Trust Server Certificate"))
+                if (builder.ContainsKey(TrustServerCertificateDesc))
                 {
-                    trustServerCertificate = $";Trust Server Certificate={builder["Trust Server Certificate"]}";
-                    builder.Remove("Trust Server Certificate");
+                    trustServerCertificate = $";{TrustServerCertificateDesc}={builder[TrustServerCertificateDesc]}";
+                    builder.Remove(TrustServerCertificateDesc);
                 }
                 tempconnectionString = builder.ConnectionString;
             }
@@ -188,23 +189,23 @@ namespace Sql2SqlCloner
             }
             if (trustServerCertificates.Checked)
             {
-                if (sourceConnection.IndexOf("trust server certificate", StringComparison.InvariantCultureIgnoreCase) < 0)
+                if (sourceConnection.IndexOf(TrustServerCertificateDesc, StringComparison.InvariantCultureIgnoreCase) < 0)
                 {
                     if (!sourceConnection.EndsWith(";"))
                     {
                         sourceConnection += ";";
                     }
 
-                    sourceConnection += "Trust Server Certificate=True";
+                    sourceConnection += TrustServerCertificateDesc + "=True";
                 }
-                if (destinationConnection.IndexOf("trust server certificate", StringComparison.InvariantCultureIgnoreCase) < 0)
+                if (destinationConnection.IndexOf(TrustServerCertificateDesc, StringComparison.InvariantCultureIgnoreCase) < 0)
                 {
                     if (!destinationConnection.EndsWith(";"))
                     {
                         destinationConnection += ";";
                     }
 
-                    destinationConnection += "Trust Server Certificate=True";
+                    destinationConnection += TrustServerCertificateDesc + "=True";
                 }
             }
 
@@ -246,7 +247,7 @@ namespace Sql2SqlCloner
                 //if using DAC connection, preload should not be considered
                 AbortBackgroundTask();
                 strtskSource = null;
-                DACConnectionString = $"Packet Size=4096;User Id={DACUSER};Password={DACPASSWORD};Data Source=ADMIN:{DACHOST};Initial Catalog={DACDATABASE};Persist Security Info=True;TrustServerCertificate=true";
+                DACConnectionString = $"Packet Size=4096;User Id={DACUSER};Password={DACPASSWORD};Data Source=ADMIN:{DACHOST};Initial Catalog={DACDATABASE};Persist Security Info=True;{TrustServerCertificateDesc}= true";
             }
             Properties.Settings.Default.SourceServer = sourceConnection;
             Properties.Settings.Default.DestinationServer = destinationConnection;
@@ -259,7 +260,7 @@ namespace Sql2SqlCloner
             var firststepok = false;
             var successConnecting = true;
             SqlSchemaTransfer schematransfer = null;
-            List<SqlSchemaObject> tablesToCopy = null;
+            IList<SqlSchemaObject> tablesToCopy = null;
             try
             {
                 SetFormControls(false);
@@ -353,7 +354,7 @@ namespace Sql2SqlCloner
             if (isData.Checked)
             {
                 SqlDataTransfer datatransfer;
-                List<SqlDataObject> itemsToCopy;
+                IList<SqlDataObject> itemsToCopy;
                 try
                 {
                     datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer,

@@ -216,7 +216,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
         private string GetMasterHistoryTable(ServerConnection connection, string tableName)
         {
-            if (dbSource.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version) && dbDestination.IsRunningMinimumSQLVersion(SQL_Versions.SQL_2016_Version))
+            if (dbSource.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016) && dbDestination.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016))
             {
                 using (var command = GetSqlCommand(connection, sqlTimeout))
                 {

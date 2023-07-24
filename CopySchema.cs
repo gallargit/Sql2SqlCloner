@@ -18,7 +18,7 @@ namespace Sql2SqlCloner
 {
     public partial class CopySchema : Form
     {
-        public List<SqlSchemaObject> CopyList { get; }
+        public IList<SqlSchemaObject> CopyList { get; }
         private readonly SqlSchemaTransfer SchemaTransfer;
         private readonly bool closeIfSuccess;
         private readonly bool disableNotForReplication;
@@ -60,7 +60,7 @@ namespace Sql2SqlCloner
                 Environment.Exit(0);
                 return;
             }
-            CopyList.ForEach(c => c.Status = Properties.Resources.empty);
+            CopyList.ToList().ForEach(c => c.Status = Properties.Resources.empty);
             dataGridView1.DataSource = CopyList;
             label1.Text = "Click on the 'Copy' button to start copying below listed SQL objects";
             if (autoStart)
@@ -205,7 +205,7 @@ namespace Sql2SqlCloner
                     MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 CopyList.Clear();
-                CopyList.AddRange(CopyListBack);
+                CopyListBack.ForEach(c => CopyList.Add(c));
                 RefreshDataGrid();
                 btnPauseEnabled = true;
             }
@@ -315,7 +315,6 @@ namespace Sql2SqlCloner
                             //this item is being processed in the background
                             continue;
                         }
-
                         currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'  {1 + current + currentBackground}/{currList.Count}";
 
                         pause.WaitOne(Timeout.Infinite);
@@ -514,7 +513,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     backgroundWorker1.ReportProgress((int)(current / max * 100.0));
-                    SchemaTransfer.CopyExtendedProperties(CopyList.ConvertAll(o => o.Object));
+                    SchemaTransfer.CopyExtendedProperties(CopyList.Select(o => o.Object));
                     backgroundWorker1.ReportProgress((int)((current += CopyList.Count / 5.0) / max * 100.0));
                 }
                 catch (Exception ex)
@@ -594,6 +593,15 @@ namespace Sql2SqlCloner
                 if (label1.Text != currentlyCopying)
                 {
                     label1.Text = currentlyCopying;
+                    bool multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
+                    if (!multiline)
+                    {
+                        label1.Top = 10;
+                    }
+                    else
+                    {
+                        label1.Top = 3;
+                    }
                     label1.Refresh();
                 }
             }
@@ -867,7 +875,7 @@ namespace Sql2SqlCloner
             {
                 waiting = (dataGridView1.Rows[0].Cells[0].Value as Bitmap)?.Tag.ToString() == Constants.WAITING;
             }
-            if (!waiting)
+            if (!waiting && e.RowIndex > -1)
             {
                 var objname = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString().Replace("[", "").Replace("]", "");
                 if (e.ColumnIndex == 5 && !string.IsNullOrEmpty(dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value.ToString()))
@@ -885,18 +893,21 @@ namespace Sql2SqlCloner
                 }
                 try
                 {
-                    var sb = new StringBuilder();
-                    foreach (var objecttoscript in SchemaTransfer.SourceObjects.Where
-                        (o => o.Type == dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString() && o.Name == objname))
+                    if (e.RowIndex > -1)
                     {
-                        foreach (var item in stGetData.GetObjectSource(objecttoscript.Object))
+                        var sb = new StringBuilder();
+                        foreach (var objecttoscript in SchemaTransfer.SourceObjects.Where
+                            (o => o.Type == dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString() && o.Name == objname))
                         {
-                            sb.Append(item).Append(Environment.NewLine).Append("GO").Append(Environment.NewLine);
+                            foreach (var item in stGetData.GetObjectSource(objecttoscript.Object))
+                            {
+                                sb.Append(item).Append(Environment.NewLine).Append("GO").Append(Environment.NewLine);
+                            }
                         }
-                    }
-                    if (sb.Length > 0)
-                    {
-                        NotepadHelper.ShowMessage(sb.ToString(), objname);
+                        if (sb.Length > 0)
+                        {
+                            NotepadHelper.ShowMessage(sb.ToString(), objname);
+                        }
                     }
                 }
                 catch { }

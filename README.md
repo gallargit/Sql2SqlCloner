@@ -48,7 +48,7 @@ These two DLLs should be copied at build time, according to these two lines in t
 
 My guess is that the first time they are not copied because the packages have not been downloaded yet, and I could not figure out a way to force package download. If you first build; then rebuild the project, they will be copied and everything will work. But since this is annoying and inconvenient a quick workaround has been made in the `Loader.cs` file. If the DLLs are not present, they will be copied at runtime from the `packages` folder.
 
-- Packages Microsoft.Data.SqlClient and Microsoft.Data.SqlClient.SNI 5.1.0 break compatibility with SQL Server 2005, hence they will not be upgraded
+- Packages Microsoft.SqlServer.SqlManagementObjects, Microsoft.Data.SqlClient and Microsoft.Data.SqlClient.SNI 5.1.0 break compatibility with SQL Server 2005, hence they will not be upgraded
 
 # New Experimental Features
 * Ability to decrypt encrypted objects using DAC connection. Triggers and functions do not work.

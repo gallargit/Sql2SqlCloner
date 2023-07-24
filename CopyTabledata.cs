@@ -18,7 +18,7 @@ namespace Sql2SqlCloner
 {
     public partial class CopyTabledata : Form
     {
-        public List<SqlDataObject> CopyList { get; }
+        public IList<SqlDataObject> CopyList { get; }
         private readonly SqlDataTransfer DataTransfer;
         private readonly SqlSchemaTransfer SchemaTransfer;
         private readonly bool SelectOnlyTables;
@@ -33,7 +33,7 @@ namespace Sql2SqlCloner
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
         private readonly object objLock = new object();
 
-        public CopyTabledata(List<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
+        public CopyTabledata(IList<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
             bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
         {
             this.initialTime = initialTime;
@@ -316,7 +316,6 @@ namespace Sql2SqlCloner
                     {
                         label1.Top = 3;
                     }
-
                     label1.Refresh();
                 }
             }
@@ -552,11 +551,10 @@ namespace Sql2SqlCloner
                 waiting = (dataGridView1.Rows[0].Cells[0].Value as Bitmap)?.Tag.ToString() == Constants.WAITING;
             }
 
-            if (!waiting)
+            if (!waiting && e.RowIndex > -1)
             {
                 var objError = "";
-                if (dataGridView1.Rows[e.RowIndex].Cells[3].Value != null &&
-                    !(dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString()).ToString().Contains("records copied"))
+                if (dataGridView1.Rows[e.RowIndex].Cells[3].Value?.ToString().Contains("records copied") == false)
                 {
                     objError = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString() + Environment.NewLine + Environment.NewLine;
                 }
