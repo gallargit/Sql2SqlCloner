@@ -98,7 +98,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                                     {
                                         if (deletesentence != "")
                                         {
-                                            lstDelete.Add(deletesentence += ")");
+                                            lstDelete.Add(deletesentence + ")");
                                         }
 
                                         deletesentence = $"DELETE FROM {reader["fk_foreign_table"]} WHERE NOT EXISTS(SELECT 1 FROM {reader["primary_table"]} WHERE ";
@@ -112,7 +112,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                                 }
                                 if (deletesentence != "")
                                 {
-                                    lstDelete.Add(deletesentence += ")");
+                                    lstDelete.Add(deletesentence + ")");
                                 }
                             }
                         }

@@ -26,7 +26,7 @@ namespace Sql2SqlCloner
         private string lastError = "";
         private string currentlyCopying = "";
         private double current;
-        private double currentBackground = 0;
+        private double currentBackground;
         private int errorCount;
         private int currrow;
         private int percentage;
@@ -211,7 +211,7 @@ namespace Sql2SqlCloner
             }
             backgroundWorker1.ReportProgress(0);
             currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
-            bool overrideCollation = false, useSourceCollation = false;
+            bool overrideCollation, useSourceCollation;
             SchemaTransfer.NoCollation = false;
             switch (Properties.Settings.Default.CopyCollation)
             {
@@ -234,8 +234,12 @@ namespace Sql2SqlCloner
                     overrideCollation = true;
                     useSourceCollation = false;
                     break;
+                default:
+                    overrideCollation = useSourceCollation = false;
+                    break;
             }
             SchemaTransfer.IncludePermissions = Properties.Settings.Default.CopyPermissions;
+            SchemaTransfer.IncludeDatabaseRoleMemberships = false; //not implemented yet
             SchemaTransfer.IgnoreFileGroup = Properties.Settings.Default.IgnoreFileGroup;
             double max = CopyList.Count;
             var CopyConstraints = Properties.Settings.Default.CopyConstraints;
@@ -593,15 +597,8 @@ namespace Sql2SqlCloner
                 if (label1.Text != currentlyCopying)
                 {
                     label1.Text = currentlyCopying;
-                    bool multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
-                    if (!multiline)
-                    {
-                        label1.Top = 10;
-                    }
-                    else
-                    {
-                        label1.Top = 3;
-                    }
+                    var multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
+                    label1.Top = !multiline ? 10 : 3;
                     label1.Refresh();
                 }
             }
@@ -630,10 +627,14 @@ namespace Sql2SqlCloner
                 btnCancel.Text = "Close";
                 btnCopyMessages.Visible = true;
                 dataGridView1.Refresh();
-                if (CopyList.Any(t => string.IsNullOrEmpty(t.Error)))
+                if (CopyList.Any(t => !string.IsNullOrEmpty(t.Error)))
                 {
                     autoScrollGrid.Text = "Show errors only";
                     autoScrollGrid.CheckState = CheckState.Unchecked;
+                }
+                else
+                {
+                    autoScrollGrid.Visible = false;
                 }
                 if (closeIfSuccess || !Properties.Settings.Default.StopIfErrors)
                 {
@@ -644,6 +645,10 @@ namespace Sql2SqlCloner
                         {
                             DialogResult = DialogResult.OK;
                             Close();
+                        }
+                        else
+                        {
+                            MessageBox.Show("No tables found to copy data from", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
                     }
                     else
@@ -807,7 +812,7 @@ namespace Sql2SqlCloner
                             }
                             else
                             {
-                                sb.Append(((Bitmap)cell.Value).Tag?.ToString());
+                                sb.Append(((Bitmap)cell.Value).Tag);
                             }
                         }
                         else
@@ -849,14 +854,7 @@ namespace Sql2SqlCloner
         {
             if (autoScrollGrid.Text == "Show errors only")
             {
-                if (autoScrollGrid.Checked)
-                {
-                    dataGridView1.DataSource = CopyList.Where(i => !string.IsNullOrEmpty(i.Error)).ToList();
-                }
-                else
-                {
-                    dataGridView1.DataSource = CopyList;
-                }
+                dataGridView1.DataSource = autoScrollGrid.Checked ? CopyList.Where(i => !string.IsNullOrEmpty(i.Error)).ToList() : CopyList;
             }
         }
 

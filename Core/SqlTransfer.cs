@@ -79,21 +79,9 @@ namespace Sql2SqlCloner.Core
             }
         }
 
-        public string SourceDatabaseName
-        {
-            get
-            {
-                return SourceConnection.DatabaseName;
-            }
-        }
+        public string SourceDatabaseName => SourceConnection.DatabaseName;
 
-        public string DestinationDatabaseName
-        {
-            get
-            {
-                return DestinationConnection.DatabaseName;
-            }
-        }
+        public string DestinationDatabaseName => DestinationConnection.DatabaseName;
 
         protected void CopyToDestination(string sql)
         {
@@ -170,14 +158,9 @@ namespace Sql2SqlCloner.Core
         {
             using (var command = GetDestinationSqlCommand(0)) //no timeout for deleting
             {
-                if (dbDestination.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016))
-                {
-                    command.CommandText = "EXEC sp_MSforeachtable @command1='SET QUOTED_IDENTIFIER ON; DELETE FROM ?', @whereand='AND o.id NOT IN (SELECT history_table_id FROM sys.tables WHERE temporal_type=2)'";
-                }
-                else
-                {
-                    command.CommandText = "EXEC sp_MSforeachtable @command1='SET QUOTED_IDENTIFIER ON; DELETE FROM ?'";
-                }
+                command.CommandText = dbDestination.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2016) ?
+                    "EXEC sp_MSforeachtable @command1='SET QUOTED_IDENTIFIER ON; DELETE FROM ?', @whereand='AND o.id NOT IN (SELECT history_table_id FROM sys.tables WHERE temporal_type=2)'" :
+                    "EXEC sp_MSforeachtable @command1='SET QUOTED_IDENTIFIER ON; DELETE FROM ?'";
 
                 command.ExecuteNonQuery();
 
@@ -263,7 +246,7 @@ namespace Sql2SqlCloner.Core
             SourceSqlCommandDisposed = false;
 
             return CreateSqlCommand(SourceConnection.SqlConnectionObject,
-                (object sender, EventArgs e) => SourceSqlCommandDisposed = true, timeout, sql);
+                (sender, e) => SourceSqlCommandDisposed = true, timeout, sql);
         }
 
         public SqlCommand GetDestinationSqlCommand(int? timeout, string sql = null)
@@ -276,7 +259,7 @@ namespace Sql2SqlCloner.Core
             DestinationSqlCommandDisposed = false;
 
             return CreateSqlCommand(DestinationConnection.SqlConnectionObject,
-                (object sender, EventArgs e) => DestinationSqlCommandDisposed = true, timeout, sql);
+                (sender, e) => DestinationSqlCommandDisposed = true, timeout, sql);
         }
 
         public SqlCommand GetSqlCommand(ServerConnection cx, int? timeout, string sql = null)
@@ -291,7 +274,7 @@ namespace Sql2SqlCloner.Core
             }
             else
             {
-                throw new Exception("Wrong connection " + cx.SqlConnectionObject.ToString());
+                throw new Exception("Wrong connection " + cx.SqlConnectionObject);
             }
         }
     }

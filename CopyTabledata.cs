@@ -16,12 +16,11 @@ using System.Windows.Forms;
 
 namespace Sql2SqlCloner
 {
-    public partial class CopyTabledata : Form
+    public sealed partial class CopyTabledata : Form
     {
         public IList<SqlDataObject> CopyList { get; }
         private readonly SqlDataTransfer DataTransfer;
         private readonly SqlSchemaTransfer SchemaTransfer;
-        private readonly bool SelectOnlyTables;
         private int currrow;
         private int errorCount;
         private int percentage;
@@ -39,7 +38,7 @@ namespace Sql2SqlCloner
             this.initialTime = initialTime;
             CopyList = list;
             var CopyRows = new ConcurrentBag<DataGridViewRow>();
-            //show form while initializating
+            //show form while initializing
             InitializeComponent();
             Visible = true;
             Cursor = Cursors.WaitCursor;
@@ -53,7 +52,6 @@ namespace Sql2SqlCloner
 
             DataTransfer = initialdatatransfer;
             SchemaTransfer = initialschematransfer;
-            SelectOnlyTables = selectOnlyTables;
 
             var tabDictionarySource = new Dictionary<string, Table>();
             SchemaTransfer.SourceObjects.OfType<SqlSchemaTable>().Select(o => o.Object as Table).ToList()
@@ -67,7 +65,7 @@ namespace Sql2SqlCloner
                 .ForEach(t => tabDictionaryDestination[t.ToString()] = t);
 
             Task tskDeleteRecords = null;
-            if (SelectOnlyTables && Properties.Settings.Default.DeleteDestinationTables)
+            if (selectOnlyTables && Properties.Settings.Default.DeleteDestinationTables)
             {
                 tskDeleteRecords = Task.Run(() =>
                 {
@@ -102,35 +100,34 @@ namespace Sql2SqlCloner
 
                     foreach (var item in sublist)
                     {
-                        long TOP = item.TopRecords;
-                        var sTOP = "";
-                        if (TOP <= 0)
+                        long itemTopRecords = item.TopRecords;
+                        var stritemTopRecords = "";
+                        if (itemTopRecords <= 0)
                         {
-                            TOP = GLOBALTOP;
+                            itemTopRecords = GLOBALTOP;
                         }
 
-                        if (GLOBALTOP > 0 && TOP > 0 && TOP > GLOBALTOP)
+                        if (GLOBALTOP > 0 && itemTopRecords > 0 && itemTopRecords > GLOBALTOP)
                         {
-                            TOP = GLOBALTOP;
+                            itemTopRecords = GLOBALTOP;
                         }
 
-                        if (TOP > 0)
+                        if (itemTopRecords > 0)
                         {
-                            if (item.RowCount < TOP)
+                            if (item.RowCount < itemTopRecords)
                             {
-                                TOP = item.RowCount;
+                                itemTopRecords = item.RowCount;
                             }
-                            sTOP = $" TOP {TOP}";
+                            stritemTopRecords = $" TOP {itemTopRecords}";
                         }
                         else
                         {
-                            TOP = item.RowCount;
+                            itemTopRecords = item.RowCount;
                         }
 
                         var fields = " *";
                         if (convertCollation)
                         {
-                            fields = "";
                             var sourceTable = tabDictionarySource[item.Table];
                             var selectList = new StringBuilder();
                             if (!tabDictionaryDestination.ContainsKey(item.Table))
@@ -149,13 +146,13 @@ namespace Sql2SqlCloner
                                         {
                                             lock (objLock)
                                             {
-                                                selectList.Append(col.ToString()).Append(" COLLATE ").Append(
-                                                    destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col.ToString());
+                                                selectList.Append(col).Append(" COLLATE ").Append(
+                                                    destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col);
                                             }
                                         }
                                         else
                                         {
-                                            selectList.Append(col.ToString());
+                                            selectList.Append(col);
                                         }
                                     }
                                 }
@@ -163,9 +160,9 @@ namespace Sql2SqlCloner
                             }
                         }
 
-                        var sql = $"SELECT{sTOP}{fields} FROM {item.Table} WITH(NOLOCK) {item.WhereFilter}";
+                        var sql = $"SELECT{stritemTopRecords}{fields} FROM {item.Table} WITH(NOLOCK) {item.WhereFilter}";
                         var row = (DataGridViewRow)dataGridView1.Rows[0].Clone();
-                        row.SetValues(Properties.Resources.empty, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant(), TOP);
+                        row.SetValues(Properties.Resources.empty, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant(), itemTopRecords);
                         CopyRows.Add(row);
                         if (CURRENTTHREAD == 0)
                         {
@@ -307,15 +304,8 @@ namespace Sql2SqlCloner
                 if (label1.Text != currentlyCopying)
                 {
                     label1.Text = currentlyCopying;
-                    bool multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
-                    if (!multiline)
-                    {
-                        label1.Top = 10;
-                    }
-                    else
-                    {
-                        label1.Top = 3;
-                    }
+                    var multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
+                    label1.Top = !multiline ? 10 : 3;
                     label1.Refresh();
                 }
             }
@@ -354,7 +344,7 @@ namespace Sql2SqlCloner
                     Application.DoEvents();
                     btnCancel.Enabled = false;
                     DateTime endTime;
-                    var msgResult = "";
+                    string msgResult;
                     try
                     {
                         DataTransfer.EnableAllDestinationConstraints();
@@ -476,14 +466,7 @@ namespace Sql2SqlCloner
 
                             if (cell is DataGridViewImageCell)
                             {
-                                if (cell.Value == null)
-                                {
-                                    sb.Append("N/A");
-                                }
-                                else
-                                {
-                                    sb.Append(((Bitmap)cell.Value).Tag?.ToString());
-                                }
+                                sb.Append(cell.Value == null ? "N/A" : ((Bitmap)cell.Value).Tag?.ToString());
                             }
                             else
                             {
@@ -556,9 +539,9 @@ namespace Sql2SqlCloner
                 var objError = "";
                 if (dataGridView1.Rows[e.RowIndex].Cells[3].Value?.ToString().Contains("records copied") == false)
                 {
-                    objError = dataGridView1.Rows[e.RowIndex].Cells[3].Value.ToString() + Environment.NewLine + Environment.NewLine;
+                    objError = dataGridView1.Rows[e.RowIndex].Cells[3].Value + Environment.NewLine + Environment.NewLine;
                 }
-                NotepadHelper.ShowMessage(objError + dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString(),
+                NotepadHelper.ShowMessage(objError + dataGridView1.Rows[e.RowIndex].Cells[2].Value,
                     dataGridView1.Rows[e.RowIndex].Cells[1].Value.ToString().Replace("[", "").Replace("]", ""));
             }
         }

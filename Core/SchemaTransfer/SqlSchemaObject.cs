@@ -13,11 +13,5 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         public string Error { get; set; }
         [System.ComponentModel.Browsable(false)]
         public SqlSchemaObject Parent { get; set; }
-
-        public SqlSchemaObject()
-        {
-            CopyData = false;
-            Parent = null;
-        }
     }
 }

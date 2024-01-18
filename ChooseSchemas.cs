@@ -18,7 +18,7 @@ namespace Sql2SqlCloner
         private readonly bool CloseIfSuccess;
         private readonly bool SelectOnlyTables;
         private readonly bool CopyOnlySchema;
-        private readonly bool AutoRun = false;
+        private readonly bool AutoRun;
         private bool NextClicked;
         private bool SortByRecords;
         private readonly ContextMenu NodeContextMenu = new ContextMenu();
@@ -40,7 +40,6 @@ namespace Sql2SqlCloner
             {
                 MessageBox.Show("No items to copy, exiting");
                 Environment.Exit(0);
-                DialogResult = DialogResult.Abort;
                 return;
             }
 
@@ -100,11 +99,10 @@ namespace Sql2SqlCloner
         {
             WHERECONDITIONS = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
             TOPROWS = new Dictionary<string, long>(StringComparer.InvariantCultureIgnoreCase);
-            var filterDataLoadingList = new List<string>();
             var filterDataLoading = ConfigurationManager.AppSettings["FilterDataLoading"];
             if (!string.IsNullOrEmpty(filterDataLoading))
             {
-                filterDataLoadingList = filterDataLoading.Replace(Environment.NewLine, "").Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+                IList<string> filterDataLoadingList = filterDataLoading.Replace(Environment.NewLine, "").Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
                 foreach (var filter in filterDataLoadingList)
                 {
                     var split = filter.Trim().Split(' ');
@@ -151,8 +149,6 @@ namespace Sql2SqlCloner
             var nodes = treeView1.Nodes;
             nodes.Clear();
             var root = nodes.Add("All");
-            TreeNode tn = root;
-
             var excludeObjectsList = new List<string>();
             var excludeDataLoadingList = new List<string>();
             try
@@ -179,9 +175,10 @@ namespace Sql2SqlCloner
             }
 
             //Tables should be shown at the first position
-            foreach (var currentitemtype in new List<string>() { "Table" }.Union(items.Select(i => i.Type).Distinct()))
+            var sqlSchemaObjects = items.ToList();
+            foreach (var currentitemtype in new List<string> { "Table" }.Union(sqlSchemaObjects.Select(i => i.Type).Distinct()))
             {
-                var itemsCurrent = items.Where(i => i.Type == currentitemtype).ToList();
+                var itemsCurrent = sqlSchemaObjects.Where(i => i.Type == currentitemtype).ToList();
                 var child = root.Nodes.Add(currentitemtype + $" ({itemsCurrent.Count})");
                 child.Checked = true;
                 if (sortByRecords && currentitemtype == "Table")
@@ -191,7 +188,7 @@ namespace Sql2SqlCloner
                 CalculateFilters();
                 foreach (var currentitem in itemsCurrent)
                 {
-                    tn = child.Nodes.Add(currentitem.Name);
+                    var tn = child.Nodes.Add(currentitem.Name);
                     tn.Checked = !CheckIfInList(currentitem.Name, excludeObjectsList);
                     if (child.Text.StartsWith("Table"))
                     {
@@ -271,7 +268,7 @@ namespace Sql2SqlCloner
 
                 if (CurrentNode.Text.Contains(" ("))
                 {
-                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" ("));
+                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" (", StringComparison.Ordinal));
                 }
 
                 CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter);
@@ -280,8 +277,8 @@ namespace Sql2SqlCloner
 
         private void MenuWhere_Click(object sender, EventArgs e)
         {
-            string defaultValue = CurrentTable.WhereFilter;
-            if (new InputBoxValidate("Filter records", "Enter where clause to filter by (empty for all)", false, icon: Icon)
+            var defaultValue = CurrentTable.WhereFilter;
+            if (new InputBoxValidate("Filter records", "Enter where clause to filter by (empty for all)", icon: Icon)
                     .ShowDialog(ref defaultValue) == DialogResult.OK)
             {
                 if (string.IsNullOrWhiteSpace(defaultValue))
@@ -296,7 +293,7 @@ namespace Sql2SqlCloner
                 CurrentTable.WhereFilter = defaultValue;
                 if (CurrentNode.Text.Contains(" ("))
                 {
-                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" ("));
+                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" (", StringComparison.Ordinal));
                 }
 
                 CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter);
@@ -308,9 +305,9 @@ namespace Sql2SqlCloner
             var includedinlist = lstExclude.Any(s => s.Equals(item, StringComparison.OrdinalIgnoreCase));
             if (!includedinlist)
             {
-                foreach (var itmExclude in lstExclude.Where(i => i.IndexOf("*") >= 0))
+                foreach (var itmExclude in lstExclude.Where(i => i.IndexOf("*", StringComparison.Ordinal) >= 0))
                 {
-                    if (item.StartsWith(itmExclude.Substring(0, itmExclude.IndexOf("*")), StringComparison.InvariantCultureIgnoreCase))
+                    if (item.StartsWith(itmExclude.Substring(0, itmExclude.IndexOf("*", StringComparison.Ordinal)), StringComparison.InvariantCultureIgnoreCase))
                     {
                         includedinlist = true;
                         break;
@@ -329,13 +326,11 @@ namespace Sql2SqlCloner
 
             foreach (var node in root.Nodes)
             {
-                if (node is TreeNode)
+                if (node is TreeNode nodetv)
                 {
-                    var nodetv = node as TreeNode;
-
                     if (nodetv.Text == "Copy Data")
                     {
-                        nodetv.Checked = (node as TreeNode)?.Checked ?? false;
+                        nodetv.Checked = nodetv.Checked;
                         return;
                     }
                     nodetv.Checked = false;
@@ -378,9 +373,9 @@ namespace Sql2SqlCloner
                         {
                             checkedItems.Add((item.Nodes[0].Tag as SqlSchemaTable)?.Name);
                         }
-                        else if (item.Tag != null && item.Tag is SqlSchemaTable)
+                        else if (item.Tag is SqlSchemaTable table)
                         {
-                            checkedItems.Add((item.Tag as SqlSchemaTable)?.Name);
+                            checkedItems.Add(table.Name);
                         }
                         else
                         {
@@ -394,15 +389,8 @@ namespace Sql2SqlCloner
                                 checkedDataTables.Add((item.Nodes[0].Tag as SqlSchemaTable)?.Name);
                             }
                             else
-                            {
-                                if (item.Tag != null && item.Tag is SqlSchemaTable)
-                                {
-                                    checkedDataTables.Add((item.Tag as SqlSchemaTable)?.Name);
-                                }
-                                else
-                                {
-                                    checkedDataTables.Add(item.Text);
-                                }
+                            { 
+                                checkedDataTables.Add(item.Tag is SqlSchemaTable table ? table.Name: item.Text);
                             }
                         }
                     }
@@ -428,14 +416,8 @@ namespace Sql2SqlCloner
                 DialogResult = DialogResult.OK;
                 Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
                 Properties.Settings.Default.DeleteDestinationTables = deleteDestinationTables.Checked;
-                if (Properties.Settings.Default.DeleteDestinationTables)
-                {
-                    Properties.Settings.Default.IncrementalDataCopy = false;
-                }
-                else
-                {
-                    Properties.Settings.Default.IncrementalDataCopy = incrementalDataCopy.Checked;
-                }
+                Properties.Settings.Default.IncrementalDataCopy = !Properties.Settings.Default.DeleteDestinationTables && 
+                                                                  incrementalDataCopy.Checked;
                 Properties.Settings.Default.Save();
             }
             else
@@ -476,14 +458,14 @@ namespace Sql2SqlCloner
         private void btnSelectSchema_Click(object sender, EventArgs e)
         {
             var defaultValue = "";
-            if (new InputBoxValidate("Schemas", "Enter schema names (separated by \",\" if more than one)", false, icon: Icon)
+            if (new InputBoxValidate("Schemas", "Enter schema names (separated by \",\" if more than one)", icon: Icon)
                     .ShowDialog(ref defaultValue) == DialogResult.OK)
             {
                 foreach (var node in treeView1.Nodes)
                 {
-                    if (node is TreeNode)
+                    if (node is TreeNode treeNode)
                     {
-                        SelectNodes(node as TreeNode, defaultValue.Split(',').Where(s => !string.IsNullOrEmpty(s)).ToList());
+                        SelectNodes(treeNode, defaultValue.Split(',').Where(s => !string.IsNullOrEmpty(s)).ToList());
                     }
                 }
             }

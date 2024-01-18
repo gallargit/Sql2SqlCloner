@@ -18,7 +18,7 @@ namespace Sql2SqlCloner
     public partial class ChooseConnections : Form
     {
         private string strtskSource, strtskDestination, sourceConnection, destinationConnection;
-        private bool EnablePreload = ConfigurationManager.AppSettings["EnablePreload"]?.ToString().ToLower() == "true";
+        private bool EnablePreload = ConfigurationManager.AppSettings["EnablePreload"]?.ToLowerInvariant() == "true";
         private bool AutoRun;
         private Task<SqlSchemaTransfer> tskPreload;
         private readonly CancellationTokenSource tokenSource = new CancellationTokenSource();
@@ -257,9 +257,9 @@ namespace Sql2SqlCloner
             Properties.Settings.Default.DecryptObjects = decryptObjects.Checked;
             Properties.Settings.Default.Save();
 
-            var firststepok = false;
+            bool firstStepOk;
             var successConnecting = true;
-            SqlSchemaTransfer schematransfer = null;
+            SqlSchemaTransfer schemaTransfer = null;
             IList<SqlSchemaObject> tablesToCopy = null;
             try
             {
@@ -267,19 +267,19 @@ namespace Sql2SqlCloner
                 Application.DoEvents();
                 if (tskPreload != null && strtskSource == sourceConnection && strtskDestination == destinationConnection)
                 {
-                    tskPreload.Wait();
-                    schematransfer = tskPreload.Result;
+                    tskPreload.Wait(cancelToken);
+                    schemaTransfer = tskPreload.Result;
                 }
                 else
                 {
                     AbortBackgroundTask();
                     cancelToken = new CancellationToken();
-                    schematransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, DACConnectionString, cancelToken);
+                    schemaTransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, DACConnectionString, cancelToken);
                 }
                 strtskSource = strtskDestination = null;
                 tskPreload = null;
 
-                if (schematransfer.SameDatabase &&
+                if (schemaTransfer.SameDatabase &&
                     MessageBox.Show("Source and destination databases are the same, do you want to continue?", "Warning",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.No)
                 {
@@ -313,10 +313,10 @@ namespace Sql2SqlCloner
                 tskPreload = null;
                 return;
             }
-            if (schematransfer.SourceObjects?.Count > 0)
+            if (schemaTransfer.SourceObjects?.Count > 0)
             {
-                firststepok = false;
-                var chooseSchema = new ChooseSchemas(schematransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked, autoRun);
+                firstStepOk = false;
+                var chooseSchema = new ChooseSchemas(schemaTransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked, autoRun);
                 var resultdiag = chooseSchema.ShowDialog();
                 if (resultdiag == DialogResult.Abort || resultdiag == DialogResult.Cancel)
                 {
@@ -325,7 +325,7 @@ namespace Sql2SqlCloner
                 }
                 else if (resultdiag == DialogResult.OK)
                 {
-                    firststepok = true;
+                    firstStepOk = true;
                     if (chooseSchema.SelectedObjects != null)
                     {
                         tablesToCopy = chooseSchema.SelectedObjects.ToList();
@@ -358,7 +358,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer,
-                        schematransfer.LstPostExecutionExecute);
+                        schemaTransfer.LstPostExecutionExecute);
                     itemsToCopy = new List<SqlDataObject>();
                     if (tablesToCopy != null)
                     {
@@ -394,7 +394,7 @@ namespace Sql2SqlCloner
 
                 if (itemsToCopy.Count > 0)
                 {
-                    var copyTableData = new CopyTabledata(itemsToCopy, datatransfer, schematransfer, firststepok || autoRun,
+                    var copyTableData = new CopyTabledata(itemsToCopy, datatransfer, schemaTransfer, firstStepOk || autoRun,
                         Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation,
                         isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null)
                     {
@@ -466,7 +466,7 @@ namespace Sql2SqlCloner
                 tokenSource.Cancel();
                 try
                 {
-                    tskPreload.Wait();
+                    tskPreload.Wait(cancelToken);
                 }
                 catch
                 {
@@ -481,6 +481,7 @@ namespace Sql2SqlCloner
 
         //Experimental Multifactor authentication for Azure Databases as seen at
         //https://stackoverflow.com/questions/60564462/how-to-connect-to-a-database-using-active-directory-login-and-multifactor-authen
+        /*
         private void MFAConnection()
         {
             string server = "tcp:XXXXXXXX.database.windows.net,1433";
@@ -492,5 +493,6 @@ namespace Sql2SqlCloner
 
             odbccon.Close();
         }
+        */
     }
 }

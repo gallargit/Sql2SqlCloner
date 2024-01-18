@@ -53,7 +53,7 @@ namespace Sql2SqlCloner.Components
             CancelButton = buttonCancel;
             if (validateLong)
             {
-                FormClosing += (object sender, FormClosingEventArgs e) =>
+                FormClosing += (sender, e) =>
                 {
                     if (DialogResult == DialogResult.OK && !long.TryParse(textBox.Text, out long _))
                     {
