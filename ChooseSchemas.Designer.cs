@@ -128,7 +128,7 @@ namespace Sql2SqlCloner
             this.copyCollation.FormattingEnabled = true;
             this.copyCollation.ItemHeight = 13;
             this.copyCollation.Location = new System.Drawing.Point(505, 252);
-            this.copyCollation.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.copyCollation.Margin = new System.Windows.Forms.Padding(2);
             this.copyCollation.Name = "copyCollation";
             this.copyCollation.Size = new System.Drawing.Size(172, 21);
             this.copyCollation.TabIndex = 13;
@@ -253,6 +253,7 @@ namespace Sql2SqlCloner
             this.clearDestinationDatabase.TabIndex = 1;
             this.clearDestinationDatabase.Text = "Clear destination database";
             this.clearDestinationDatabase.UseVisualStyleBackColor = true;
+            this.clearDestinationDatabase.CheckedChanged += new System.EventHandler(this.clearDestinationDatabase_CheckedChanged);
             // 
             // label2
             // 

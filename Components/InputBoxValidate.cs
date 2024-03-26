@@ -20,10 +20,8 @@ namespace Sql2SqlCloner.Components
             {
                 Icon = icon;
             }
-
             Text = title;
             label.Text = promptText;
-
             if (hideChars)
             {
                 textBox.PasswordChar = '*';
@@ -68,8 +66,11 @@ namespace Sql2SqlCloner.Components
         public DialogResult ShowDialog(ref string value)
         {
             textBox.Text = value;
-            DialogResult dialogResult = ShowDialog();
-            value = textBox.Text;
+            var dialogResult = ShowDialog();
+            if (dialogResult == DialogResult.OK)
+            {
+                value = textBox.Text;
+            }
             return dialogResult;
         }
     }

@@ -204,6 +204,16 @@ namespace Sql2SqlCloner
 
         private void btnNext_Click(object sender, EventArgs e)
         {
+            if (Properties.Settings.Default.ClearDestinationDatabase &&
+                ConfigurationManager.AppSettings["DeleteDatabaseDataConfirm"]?.Equals("true", StringComparison.InvariantCultureIgnoreCase) == true &&
+                MessageBox.Show($"The data from database '{SchemaTransfer.DestinationCxInfo()}' is about to be deleted. Continue?",
+                    "Database data deletion",
+                    MessageBoxButtons.OKCancel) == DialogResult.Cancel)
+            {
+                DialogResult = DialogResult.Cancel;
+                Environment.Exit(0);
+                return;
+            }
             btnNext.Enabled = false;
             Cursor = Cursors.WaitCursor;
             backgroundWorker1.DoWork += backgroundWorker1_DoWork;
@@ -325,7 +335,7 @@ namespace Sql2SqlCloner
                     //prevent out of range exception when counting processed records
                     try
                     {
-                        totalRecs = $" {CopyList.Select(t => t.RowCount).Sum()} records copied from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
+                        totalRecs = $" {CopyList.Sum(t => t.RowCount)} records copied from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
                     }
                     catch { }
                 }

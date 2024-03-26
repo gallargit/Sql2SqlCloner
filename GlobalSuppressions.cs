@@ -5,8 +5,6 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("CodeQuality", "IDE0051:Remove unused private members", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.MFAConnection")]
-[assembly: SuppressMessage("General", "RCS1118:Mark local variable as const.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.MFAConnection")]
 [assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.Core.SchemaTransfer.SqlSchemaTransfer.RemoveSchemaBindingFromDestination")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.btnCancel_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.btnDestination_Click(System.Object,System.EventArgs)")]
@@ -42,5 +40,6 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_DataError(System.Object,System.Windows.Forms.DataGridViewDataErrorEventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.deleteDestinationTables_CheckedChanged(System.Object,System.EventArgs)")]
+[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.clearDestinationDatabase_CheckedChanged(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]
 [assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopySchema.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]

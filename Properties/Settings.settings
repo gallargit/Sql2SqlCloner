@@ -50,9 +50,6 @@
     <Setting Name="IgnoreFileGroup" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="AlwaysTrustServerCertificates" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
-    </Setting>
     <Setting Name="DecryptObjects" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>

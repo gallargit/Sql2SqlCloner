@@ -172,7 +172,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 {
                     while (reader.Read())
                     {
-                        lst.Add((string)reader["colName"]);
+                        lst.Add(reader["colName"].ToString());
                     }
                 }
                 return lst.AsEnumerable();
@@ -186,7 +186,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 command.CommandText = @"SELECT c.[name] AS constraint_name, SUBSTRING(column_names, 1, len(column_names)-1) AS constraint_columns
                 FROM sys.objects t LEFT OUTER JOIN sys.indexes i ON t.object_id=i.object_id
                     LEFT OUTER JOIN sys.key_constraints c ON i.object_id=c.parent_object_id AND i.index_id=c.unique_index_id
-                    CROSS APPLY (SELECT col.[name] + ','
+                    CROSS APPLY (SELECT QUOTENAME(col.[name]) + ','
                                     FROM sys.index_columns ic
                                     INNER JOIN sys.columns col ON ic.object_id=col.object_id AND ic.column_id=col.column_id
                                     WHERE ic.object_id=t.object_id AND ic.index_id=i.index_id
@@ -206,8 +206,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                         {
                             key += "x";
                         }
-                        var value = (string)reader["constraint_columns"];
-                        lst.Add(key, value);
+                        lst.Add(key, reader["constraint_columns"].ToString());
                     }
                 }
                 return lst;
@@ -274,9 +273,8 @@ namespace Sql2SqlCloner.Core.DataTransfer
                             {
                                 //create a temporary name
                                 var indexname = "index" + DateTime.Now.Ticks + "TMP" + Math.Abs(uqIndex.GetHashCode() % 10000);
-                                var sqlCreateIndex = $"CREATE UNIQUE NONCLUSTERED INDEX {indexname} ON {tableName} ({uqIndex.Value}" +
+                                command.CommandText = $"CREATE UNIQUE NONCLUSTERED INDEX {indexname} ON {tableName} ({uqIndex.Value}" +
                                      ") WITH(PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = ON, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]";
-                                command.CommandText = sqlCreateIndex;
                                 command.ExecuteNonQuery();
                                 strDropIndex.Add($"DROP INDEX {indexname} ON {tableName}");
                             }

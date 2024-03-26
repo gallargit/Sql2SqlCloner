@@ -1,3 +1,5 @@
+// NotepadHelper: open notepad and send text to it
+
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;

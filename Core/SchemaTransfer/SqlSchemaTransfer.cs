@@ -62,8 +62,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             set => transfer.Options.NoFileGroup = value;
         }
 
-        public SqlSchemaTransfer(string src, string dst, bool skipPreload, string DACConnectionString,
-            CancellationToken ct) : base(src, dst, null)
+        public SqlSchemaTransfer(string src, string dst, bool skipPreload, string DACConnectionString, CancellationToken ct) : base(src, dst, null)
         {
             DACconnection = DACConnectionString;
             CancelToken = ct;
@@ -686,23 +685,23 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 raiserrorTOKENSOld = new List<TokenInfoExtended>();
                                 raiserrorTOKENS = new TokenInfoExtended[8];
                                 raiserrorTOKENS[0] = new TokenInfoExtended()
-                                    { SQL = "(", Token = TOKEN_LEFT_PARENTHESIS };
+                                { SQL = "(", Token = TOKEN_LEFT_PARENTHESIS };
 
                                 raiserrorTOKENS[1] = new TokenInfoExtended()
-                                    { SQL = "50001", Token = (int)Tokens.TOKEN_INTEGER }; //id
+                                { SQL = "50001", Token = (int)Tokens.TOKEN_INTEGER }; //id
                                 raiserrorTOKENS[2] = new TokenInfoExtended()
-                                    { SQL = null, Token = (int)Tokens.TOKEN_STRING }; //error msg
+                                { SQL = null, Token = (int)Tokens.TOKEN_STRING }; //error msg
 
                                 raiserrorTOKENS[3] = new TokenInfoExtended() { SQL = ",", Token = TOKEN_COMMA };
                                 raiserrorTOKENS[4] = new TokenInfoExtended()
-                                    { SQL = "16", Token = (int)Tokens.TOKEN_INTEGER }; //severity
+                                { SQL = "16", Token = (int)Tokens.TOKEN_INTEGER }; //severity
 
                                 raiserrorTOKENS[5] = new TokenInfoExtended() { SQL = ",", Token = TOKEN_COMMA };
                                 raiserrorTOKENS[6] = new TokenInfoExtended()
-                                    { SQL = "1", Token = (int)Tokens.TOKEN_INTEGER }; //state
+                                { SQL = "1", Token = (int)Tokens.TOKEN_INTEGER }; //state
 
                                 raiserrorTOKENS[7] = new TokenInfoExtended()
-                                    { SQL = ")", Token = TOKEN_RIGHT_PARENTHESIS };
+                                { SQL = ")", Token = TOKEN_RIGHT_PARENTHESIS };
                                 tokenRaiseIndex = 1;
                             }
 
@@ -1428,7 +1427,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             foreach (Rule item in db.Rules)
             {
                 items.Add(new SqlSchemaObject
-                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1449,7 +1448,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             foreach (Default item in db.Defaults)
             {
                 items.Add(new SqlSchemaObject
-                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1472,7 +1471,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 foreach (UserDefinedTableType item in db.UserDefinedTableTypes)
                 {
                     items.Add(new SqlSchemaObject
-                        { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
 
@@ -1521,7 +1520,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 foreach (Sequence item in db.Sequences)
                 {
                     items.Add(new SqlSchemaObject
-                        { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
 
@@ -1582,7 +1581,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     foreach (Trigger trigger in item.Triggers)
                     {
                         items.Add(new SqlSchemaObject
-                            { Parent = table, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
+                        { Parent = table, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
                     }
                 }
             }
@@ -1604,7 +1603,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 foreach (Trigger trigger in item.Triggers)
                 {
                     items.Add(new SqlSchemaObject
-                        { Parent = view, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
+                    { Parent = view, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
                 }
             }
 
@@ -1655,7 +1654,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                          .Where(f => !f.IsSystemObject || f.Owner != "sys"))
             {
                 items.Add(new SqlSchemaObject
-                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1667,7 +1666,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                          .Where(p => !p.IsSystemObject || p.Owner != "sys"))
             {
                 items.Add(new SqlSchemaObject
-                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1924,7 +1923,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 FullTextIndex fulltextind = (obj as TableViewBase)?.FullTextIndex;
                 if (fulltextind != null)
                 {
-
                     FullTextIndex index = new FullTextIndex(destinationTable)
                     {
                         CatalogName = fulltextind.CatalogName,
@@ -2011,7 +2009,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 sourceSQLConnection = new SqlConnection(SourceConnectionString);
                 sourceSQLConnection.Open();
             }
-
             sourceConnection = new ServerConnection(sourceSQLConnection);
             sourceServer = new Server(sourceConnection);
             InitServer(sourceServer);
@@ -2083,7 +2080,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             //will be performed there
             var transferDrop = new SqlSchemaTransfer(DestinationConnectionString, DestinationConnectionString, true,
                     null, CancelToken)
-                { transfer = { CopyAllObjects = false } };
+            { transfer = { CopyAllObjects = false } };
             transferDrop.transfer.Options.ScriptDrops =
                 transferDrop.transfer.Options.IncludeIfNotExists =
                     transferDrop.transfer.Options.ContinueScriptingOnError = true;

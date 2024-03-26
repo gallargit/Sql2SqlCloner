@@ -39,7 +39,6 @@
             this.isSchema = new System.Windows.Forms.CheckBox();
             this.isData = new System.Windows.Forms.CheckBox();
             this.lblPleaseWait = new System.Windows.Forms.Label();
-            this.trustServerCertificates = new System.Windows.Forms.CheckBox();
             this.decryptObjects = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
@@ -153,24 +152,12 @@
             this.lblPleaseWait.Text = "Please Wait...";
             this.lblPleaseWait.Visible = false;
             // 
-            // trustServerCertificates
-            // 
-            this.trustServerCertificates.AutoSize = true;
-            this.trustServerCertificates.Checked = true;
-            this.trustServerCertificates.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.trustServerCertificates.Location = new System.Drawing.Point(325, 153);
-            this.trustServerCertificates.Name = "trustServerCertificates";
-            this.trustServerCertificates.Size = new System.Drawing.Size(168, 17);
-            this.trustServerCertificates.TabIndex = 7;
-            this.trustServerCertificates.Text = "Always trust server certificates";
-            this.trustServerCertificates.UseVisualStyleBackColor = true;
-            // 
             // decryptObjects
             // 
             this.decryptObjects.AutoSize = true;
             this.decryptObjects.Checked = true;
             this.decryptObjects.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.decryptObjects.Location = new System.Drawing.Point(325, 176);
+            this.decryptObjects.Location = new System.Drawing.Point(325, 153);
             this.decryptObjects.Name = "decryptObjects";
             this.decryptObjects.Size = new System.Drawing.Size(209, 17);
             this.decryptObjects.TabIndex = 8;
@@ -183,7 +170,6 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(546, 261);
             this.Controls.Add(this.decryptObjects);
-            this.Controls.Add(this.trustServerCertificates);
             this.Controls.Add(this.lblPleaseWait);
             this.Controls.Add(this.isData);
             this.Controls.Add(this.isSchema);
@@ -220,7 +206,6 @@
         private System.Windows.Forms.CheckBox isSchema;
         private System.Windows.Forms.CheckBox isData;
         private System.Windows.Forms.Label lblPleaseWait;
-        private System.Windows.Forms.CheckBox trustServerCertificates;
         private System.Windows.Forms.CheckBox decryptObjects;
     }
 }

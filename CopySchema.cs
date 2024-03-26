@@ -36,7 +36,7 @@ namespace Sql2SqlCloner
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
 
-        public CopySchema(SqlSchemaTransfer transferSchema, List<SqlSchemaObject> lstObjects,
+        public CopySchema(SqlSchemaTransfer transferSchema, IList<SqlSchemaObject> lstObjects,
             bool closeIfSuccess, bool autoStart, bool disableNotForReplication)
         {
             InitializeComponent();
@@ -135,7 +135,8 @@ namespace Sql2SqlCloner
                 try
                 {
                     currentBackground++;
-                    stransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
+                    stransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
+                        overrideCollation, useSourceCollation, false, null);
                     item.Status = Properties.Resources.success;
                     item.Status.Tag = Constants.OK;
                     item.Error = "";
@@ -332,7 +333,8 @@ namespace Sql2SqlCloner
                         }
                         try
                         {
-                            SchemaTransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects, overrideCollation, useSourceCollation, false, null);
+                            SchemaTransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
+                                overrideCollation, useSourceCollation, false, null);
                             item.Status = Properties.Resources.success;
                             item.Status.Tag = Constants.OK;
                             item.Error = "";

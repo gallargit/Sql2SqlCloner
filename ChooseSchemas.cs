@@ -102,16 +102,15 @@ namespace Sql2SqlCloner
             var filterDataLoading = ConfigurationManager.AppSettings["FilterDataLoading"];
             if (!string.IsNullOrEmpty(filterDataLoading))
             {
-                IList<string> filterDataLoadingList = filterDataLoading.Replace(Environment.NewLine, "").Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
-                foreach (var filter in filterDataLoadingList)
+                foreach (var filter in (IList<string>)filterDataLoading.Replace(Environment.NewLine, "").Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToList())
                 {
-                    var split = filter.Trim().Split(' ');
-                    var key = split[0].ToUpperInvariant();
-                    if (split.Length > 2 && split[1].Equals("WHERE", StringComparison.InvariantCultureIgnoreCase))
+                    var split = filter.Trim().Split(' ').ToList();
+                    var key = AddBrackets(split[0].ToUpperInvariant());
+                    if (split.Count > 2 && split[1].Equals("WHERE", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        WHERECONDITIONS[key] = string.Join(" ", split.Skip(1).ToArray()).Trim();
+                        WHERECONDITIONS[key] = string.Join(" ", new[] { "WHERE" }.Concat(new[] { AddBrackets(split.Skip(2).First()) }).Concat(split.Skip(3))).Trim();
                     }
-                    else if (split.Length > 2 && split[1].Equals("TOP", StringComparison.InvariantCultureIgnoreCase))
+                    else if (split.Count > 2 && split[1].Equals("TOP", StringComparison.InvariantCultureIgnoreCase))
                     {
                         if (long.TryParse(split[2], out long toprows))
                         {
@@ -120,28 +119,28 @@ namespace Sql2SqlCloner
                     }
                 }
             }
+        }
 
-            var lstAddNobracketWHERE = new Dictionary<string, string>();
-            foreach (var item in WHERECONDITIONS)
+        private string AddBrackets(string item)
+        {
+            var itemWithBrackets = "";
+            foreach (var itemSplitDot in item.Split('.'))
             {
-                var nobracket = item.Key.Replace("[", "").Replace("]", "");
-                if (nobracket != item.Key)
+                if (itemWithBrackets != "")
                 {
-                    lstAddNobracketWHERE[nobracket] = item.Value;
+                    itemWithBrackets += ".";
+                }
+                if (!itemSplitDot.StartsWith("["))
+                {
+                    itemWithBrackets += "[";
+                }
+                itemWithBrackets += itemSplitDot;
+                if (!itemSplitDot.EndsWith("]"))
+                {
+                    itemWithBrackets += "]";
                 }
             }
-            lstAddNobracketWHERE.ToList().ForEach(d => WHERECONDITIONS[d.Key] = d.Value);
-
-            var lstAddNobracketTOP = new Dictionary<string, long>();
-            foreach (var item in TOPROWS)
-            {
-                var nobracket = item.Key.Replace("[", "").Replace("]", "");
-                if (nobracket != item.Key)
-                {
-                    lstAddNobracketTOP[nobracket] = item.Value;
-                }
-            }
-            lstAddNobracketTOP.ToList().ForEach(d => TOPROWS[d.Key] = d.Value);
+            return itemWithBrackets;
         }
 
         private void LoadTreeNodes(bool sortByRecords)
@@ -317,7 +316,7 @@ namespace Sql2SqlCloner
             return includedinlist;
         }
 
-        protected void SelectNodes(TreeNode root, List<string> startsWith)
+        protected void SelectNodes(TreeNode root, IList<string> startsWith)
         {
             if (startsWith?.Any() != true)
             {
@@ -334,8 +333,7 @@ namespace Sql2SqlCloner
                         return;
                     }
                     nodetv.Checked = false;
-                    startsWith.ForEach(s => nodetv.Checked = nodetv.Checked || nodetv.Text.ToUpperInvariant().StartsWith($"{s.ToUpperInvariant()}."));
-
+                    startsWith.ToList().ForEach(s => nodetv.Checked = nodetv.Checked || nodetv.Text.ToUpperInvariant().StartsWith($"{s.ToUpperInvariant()}."));
                     if (nodetv.Checked && nodetv.Nodes.Count > 0 && nodetv.Nodes[0].Tag != null && nodetv.Nodes[0].Tag is SqlSchemaTable)
                     {
                         nodetv.Nodes[0].Checked = true;
@@ -389,8 +387,8 @@ namespace Sql2SqlCloner
                                 checkedDataTables.Add((item.Nodes[0].Tag as SqlSchemaTable)?.Name);
                             }
                             else
-                            { 
-                                checkedDataTables.Add(item.Tag is SqlSchemaTable table ? table.Name: item.Text);
+                            {
+                                checkedDataTables.Add(item.Tag is SqlSchemaTable table ? table.Name : item.Text);
                             }
                         }
                     }
@@ -416,7 +414,7 @@ namespace Sql2SqlCloner
                 DialogResult = DialogResult.OK;
                 Properties.Settings.Default.CopyCollation = (SqlCollationAction)copyCollation.SelectedIndex;
                 Properties.Settings.Default.DeleteDestinationTables = deleteDestinationTables.Checked;
-                Properties.Settings.Default.IncrementalDataCopy = !Properties.Settings.Default.DeleteDestinationTables && 
+                Properties.Settings.Default.IncrementalDataCopy = !Properties.Settings.Default.DeleteDestinationTables &&
                                                                   incrementalDataCopy.Checked;
                 Properties.Settings.Default.Save();
             }
@@ -523,6 +521,11 @@ namespace Sql2SqlCloner
         private void deleteDestinationTables_CheckedChanged(object sender, EventArgs e)
         {
             incrementalDataCopy.Enabled = !deleteDestinationTables.Checked;
+        }
+
+        private void clearDestinationDatabase_CheckedChanged(object sender, EventArgs e)
+        {
+            dropAndRecreateObjects.Enabled = !clearDestinationDatabase.Checked;
         }
     }
 }

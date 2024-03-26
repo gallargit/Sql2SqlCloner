@@ -1,5 +1,4 @@
-﻿using Microsoft.Data.ConnectionUI;
-using Sql2SqlCloner.Components;
+﻿using Sql2SqlCloner.Components;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
@@ -62,42 +61,11 @@ namespace Sql2SqlCloner
 
         private string GetConnectionString(string connectionString)
         {
-            string tempconnectionString;
-            var trustServerCertificate = "";
-            try
+            if (new SQLConnectionDialog(Icon).ShowDialog(ref connectionString) == DialogResult.OK)
             {
-                var builder = new DbConnectionStringBuilder
-                {
-                    ConnectionString = connectionString
-                };
-                //"Trust Server Certificate" is not supported by Connection Dialog
-                if (builder.ContainsKey(TrustServerCertificateDesc))
-                {
-                    trustServerCertificate = $";{TrustServerCertificateDesc}={builder[TrustServerCertificateDesc]}";
-                    builder.Remove(TrustServerCertificateDesc);
-                }
-                tempconnectionString = builder.ConnectionString;
+                return connectionString;
             }
-            catch
-            {
-                tempconnectionString = null; //bad connection string
-            }
-
-            string conn = null;
-            using (var dialog = new DataConnectionDialog())
-            {
-                dialog.DataSources.Add(DataSource.SqlDataSource);
-                if (!string.IsNullOrEmpty(tempconnectionString))
-                {
-                    dialog.ConnectionString = tempconnectionString;
-                }
-
-                if (DataConnectionDialog.Show(dialog) == DialogResult.OK)
-                {
-                    conn = dialog.ConnectionString + trustServerCertificate;
-                }
-            }
-            return conn;
+            return "";
         }
 
         private void SetFormControls(bool active)
@@ -118,7 +86,6 @@ namespace Sql2SqlCloner
             txtDestination.Text = GetConnection(destinationConnection);
             isSchema.Checked = Properties.Settings.Default.CopySchema;
             isData.Checked = Properties.Settings.Default.CopyData;
-            trustServerCertificates.Checked = Properties.Settings.Default.AlwaysTrustServerCertificates;
             decryptObjects.Checked = Properties.Settings.Default.DecryptObjects;
 
             if (sender != null && e != null && AutoRun)
@@ -187,27 +154,6 @@ namespace Sql2SqlCloner
                 txtDestination.Focus();
                 return;
             }
-            if (trustServerCertificates.Checked)
-            {
-                if (sourceConnection.IndexOf(TrustServerCertificateDesc, StringComparison.InvariantCultureIgnoreCase) < 0)
-                {
-                    if (!sourceConnection.EndsWith(";"))
-                    {
-                        sourceConnection += ";";
-                    }
-
-                    sourceConnection += TrustServerCertificateDesc + "=True";
-                }
-                if (destinationConnection.IndexOf(TrustServerCertificateDesc, StringComparison.InvariantCultureIgnoreCase) < 0)
-                {
-                    if (!destinationConnection.EndsWith(";"))
-                    {
-                        destinationConnection += ";";
-                    }
-
-                    destinationConnection += TrustServerCertificateDesc + "=True";
-                }
-            }
 
             string DACConnectionString = null;
             if (Properties.Settings.Default.DecryptObjects)
@@ -253,7 +199,6 @@ namespace Sql2SqlCloner
             Properties.Settings.Default.DestinationServer = destinationConnection;
             Properties.Settings.Default.CopySchema = isSchema.Checked;
             Properties.Settings.Default.CopyData = isData.Checked;
-            Properties.Settings.Default.AlwaysTrustServerCertificates = trustServerCertificates.Checked;
             Properties.Settings.Default.DecryptObjects = decryptObjects.Checked;
             Properties.Settings.Default.Save();
 
@@ -478,21 +423,5 @@ namespace Sql2SqlCloner
             }
             tskPreload = null;
         }
-
-        //Experimental Multifactor authentication for Azure Databases as seen at
-        //https://stackoverflow.com/questions/60564462/how-to-connect-to-a-database-using-active-directory-login-and-multifactor-authen
-        /*
-        private void MFAConnection()
-        {
-            string server = "tcp:XXXXXXXX.database.windows.net,1433";
-            string dbname = "db";
-            string username = "user@user.com";
-
-            System.Data.Odbc.OdbcConnection odbccon = new System.Data.Odbc.OdbcConnection($"Driver={{ODBC Driver 17 for SQL Server}};Server={server};Database={dbname};Encrypt=yes;TrustServerCertificate=no;Authentication=ActiveDirectoryInteractive;UID={username};Connection Timeout=30");
-            odbccon.Open();
-
-            odbccon.Close();
-        }
-        */
     }
 }

@@ -79,9 +79,9 @@ namespace Sql2SqlCloner.Core
             }
         }
 
-        public string SourceDatabaseName => SourceConnection.DatabaseName;
+        public string SourceDatabaseName => SourceConnection.CurrentDatabase;
 
-        public string DestinationDatabaseName => DestinationConnection.DatabaseName;
+        public string DestinationDatabaseName => DestinationConnection.CurrentDatabase;
 
         protected void CopyToDestination(string sql)
         {
