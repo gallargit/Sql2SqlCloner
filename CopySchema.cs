@@ -97,7 +97,7 @@ namespace Sql2SqlCloner
             backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
             backgroundWorker1.WorkerSupportsCancellation = true;
             backgroundWorker1.WorkerReportsProgress = true;
-            currentlyCopying = label1.Text = "Copying schema...";
+            currentlyCopying = label1.Text = "Copying schema";
             progressBar1.Value = 0;
             backgroundWorker1.RunWorkerAsync();
         }
@@ -169,7 +169,7 @@ namespace Sql2SqlCloner
                             exc = exc.InnerException;
                             if (item.Parent != null)
                             {
-                                item.Error += ";" + item.Parent.Type + ": " + item.Parent.Name;
+                                item.Error += $";{item.Parent.Type}: {item.Parent.Name}";
                             }
                         }
                     }
@@ -195,7 +195,7 @@ namespace Sql2SqlCloner
 
                 RefreshDataGrid();
 
-                currentlyCopying = $"Clearing destination database {SchemaTransfer.DestinationCxInfo()}...";
+                currentlyCopying = $"Clearing destination database {SchemaTransfer.DestinationCxInfo()}";
                 backgroundWorker1.ReportProgress(0);
                 try
                 {
@@ -396,12 +396,13 @@ namespace Sql2SqlCloner
                                     {
                                         item.Error += ";";
                                     }
-                                    item.Error += exc.Message;
+                                    //sometimes error messages are duplicated by SMO, discard duplicates
+                                    item.Error += string.Join(Environment.NewLine, exc.Message.Split(Environment.NewLine.ToCharArray()).Where(s => !string.IsNullOrEmpty(s)).Distinct());
                                 }
                                 exc = exc.InnerException;
                                 if (item.Parent != null)
                                 {
-                                    item.Error += ";" + item.Parent.Type + ": " + item.Parent.Name;
+                                    item.Error += $";{item.Parent.Type}: {item.Parent.Name}";
                                 }
                             }
                             if (item.Status.Tag.ToString() != Constants.WARNING)
@@ -438,7 +439,7 @@ namespace Sql2SqlCloner
                         return;
                     }
                     SchemaTransfer.RefreshDestination();
-                    currentlyCopying = "Processing indexes...";
+                    currentlyCopying = "Processing indexes";
 
                     //tables should go first
                     foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").OrderBy(ix => ix.Type).ToList())
@@ -458,7 +459,7 @@ namespace Sql2SqlCloner
                     {
                         return;
                     }
-                    currentlyCopying = "Processing foreign keys...";
+                    currentlyCopying = "Processing foreign keys";
                     var savecurrent = current;
                     foreach (var item in CopyList.Where(i => i.Type == "Table").ToList())
                     {
@@ -481,7 +482,7 @@ namespace Sql2SqlCloner
                     }
 
                     savecurrent = current;
-                    currentlyCopying = "Processing checks...";
+                    currentlyCopying = "Processing checks";
                     foreach (var item in CopyList.Where(i => i.Type == "Table"))
                     {
                         try
@@ -515,7 +516,7 @@ namespace Sql2SqlCloner
 
             if (Properties.Settings.Default.CopyExtendedProperties)
             {
-                currentlyCopying = "Processing extended properties...";
+                currentlyCopying = "Processing extended properties";
                 try
                 {
                     backgroundWorker1.ReportProgress((int)(current / max * 100.0));
@@ -536,7 +537,7 @@ namespace Sql2SqlCloner
 
             if (Properties.Settings.Default.CopyPermissions)
             {
-                currentlyCopying = "Processing permissions...";
+                currentlyCopying = "Processing permissions";
                 try
                 {
                     //not needed SchemaTransfer.CopyPermissions();
@@ -719,6 +720,7 @@ namespace Sql2SqlCloner
             }
             if (current == 0 || btnCancel.Text == "Close")
             {
+                Visible = false;
                 DialogResult = DialogResult.Abort;
                 Environment.Exit(0);
                 return;

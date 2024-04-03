@@ -272,7 +272,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                             foreach (var uqIndex in uniqueColumns)
                             {
                                 //create a temporary name
-                                var indexname = "index" + DateTime.Now.Ticks + "TMP" + Math.Abs(uqIndex.GetHashCode() % 10000);
+                                var indexname = $"index{DateTime.Now.Ticks}TMP{Math.Abs(uqIndex.GetHashCode() % 10000)}";
                                 command.CommandText = $"CREATE UNIQUE NONCLUSTERED INDEX {indexname} ON {tableName} ({uqIndex.Value}" +
                                      ") WITH(PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = ON, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]";
                                 command.ExecuteNonQuery();

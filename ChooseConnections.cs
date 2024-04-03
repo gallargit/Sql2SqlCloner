@@ -126,8 +126,7 @@ namespace Sql2SqlCloner
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
-            //Application.Exit() cannot be called because the SQL Connection dialog prevents
-            //the application from exiting if the Cancel button is clicked
+            Visible = false;
             Environment.Exit(0);
         }
 
@@ -205,7 +204,7 @@ namespace Sql2SqlCloner
             bool firstStepOk;
             var successConnecting = true;
             SqlSchemaTransfer schemaTransfer = null;
-            IList<SqlSchemaObject> tablesToCopy = null;
+            IList<SqlSchemaTable> tablesToCopy = null;
             try
             {
                 SetFormControls(false);
@@ -273,7 +272,7 @@ namespace Sql2SqlCloner
                     firstStepOk = true;
                     if (chooseSchema.SelectedObjects != null)
                     {
-                        tablesToCopy = chooseSchema.SelectedObjects.ToList();
+                        tablesToCopy = chooseSchema.SelectedObjects.OfType<SqlSchemaTable>().Where(c => c.CopyData).ToList();
                     }
                     else
                     {
@@ -289,44 +288,29 @@ namespace Sql2SqlCloner
             }
             else
             {
-                {
-                    MessageBox.Show("No SQL objects found in source database to copy from");
-                    Environment.Exit(0);
-                    return;
-                }
+                MessageBox.Show("No SQL objects found in source database to copy from");
+                Environment.Exit(0);
+                return;
             }
 
             if (isData.Checked)
             {
                 SqlDataTransfer datatransfer;
-                IList<SqlDataObject> itemsToCopy;
                 try
                 {
-                    datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer,
-                        schemaTransfer.LstPostExecutionExecute);
-                    itemsToCopy = new List<SqlDataObject>();
-                    if (tablesToCopy != null)
-                    {
-                        tablesToCopy.Where(t => t.CopyData).ToList().ForEach(item =>
-                            itemsToCopy.Add(new SqlDataObject
-                            {
-                                Table = item.Object.ToString(),
-                                TopRecords = ((SqlSchemaTable)item).TopRecords,
-                                WhereFilter = ((SqlSchemaTable)item).WhereFilter,
-                                HasRelationships = ((SqlSchemaTable)item).HasRelationships,
-                                RowCount = ((SqlSchemaTable)item).RowCount
-                            })
-                        );
-                        if (itemsToCopy.Count == 0)
-                        {
-                            //no tables selected, no need to copy data
-                            Environment.Exit(0);
-                            return;
-                        }
-                    }
-                    else
+                    datatransfer = new SqlDataTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, schemaTransfer.LstPostExecutionExecute);
+                    if (tablesToCopy == null)
                     {
                         MessageBox.Show("No tables found, exiting");
+                        Visible = false;
+                        Environment.Exit(0);
+                        return;
+                    }
+                    else if (!tablesToCopy.Any(t => t.CopyData))
+                    {
+                        //no tables selected, no need to copy data
+                        MessageBox.Show("Finished. No tables selected to copy data from");
+                        Visible = false;
                         Environment.Exit(0);
                         return;
                     }
@@ -336,32 +320,22 @@ namespace Sql2SqlCloner
                     MessageBox.Show(exc.Message);
                     return;
                 }
-
-                if (itemsToCopy.Count > 0)
+                var copyTableData = new CopyTabledata(tablesToCopy, datatransfer, schemaTransfer, firstStepOk || autoRun,
+                    Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation,
+                    isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null)
                 {
-                    var copyTableData = new CopyTabledata(itemsToCopy, datatransfer, schemaTransfer, firstStepOk || autoRun,
-                        Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation,
-                        isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null)
-                    {
-                        Visible = false
-                    };
-                    copyTableData.ShowDialog();
-                    if (copyTableData.DialogResult == DialogResult.Retry)
-                    {
-                        RestartForm();
-                    }
-                    else
-                    {
-                        Environment.Exit(0);
-                    }
-                    return;
+                    Visible = false
+                };
+                copyTableData.ShowDialog();
+                if (copyTableData.DialogResult == DialogResult.Retry)
+                {
+                    RestartForm();
                 }
                 else
                 {
-                    MessageBox.Show("No tables found in source database to copy data from");
                     Environment.Exit(0);
-                    return;
                 }
+                return;
             }
             if (!isData.Checked && !isSchema.Checked)
             {

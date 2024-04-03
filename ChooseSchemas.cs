@@ -26,6 +26,7 @@ namespace Sql2SqlCloner
         private TreeNode CurrentNode;
         private Dictionary<string, string> WHERECONDITIONS;
         private Dictionary<string, long> TOPROWS;
+        private Dictionary<string, string> ORDERBYFIELDS;
 
         public ChooseSchemas(SqlSchemaTransfer transferSchema, bool closeIfSuccess, bool selectOnlyTables, bool copyOnlySchema, bool autoRun)
         {
@@ -65,6 +66,14 @@ namespace Sql2SqlCloner
             };
             menuWhere.Click += MenuWhere_Click;
             NodeContextMenu.MenuItems.Add(menuWhere);
+
+            var menuOrderBy = new MenuItem
+            {
+                Text = "Order By"
+            };
+            menuOrderBy.Click += MenuOrderBy_Click;
+            NodeContextMenu.MenuItems.Add(menuOrderBy);
+
             if (!copyOnlySchema && long.TryParse(ConfigurationManager.AppSettings["GlobalTOP"], out long GLOBALTOP) && GLOBALTOP > 0)
             {
                 label1.Text = $"Global TOP is: {GLOBALTOP}  {label1.Text}";
@@ -74,7 +83,7 @@ namespace Sql2SqlCloner
             AutoRun = autoRun;
         }
 
-        private string FormatCopyData(long ROWCOUNT, long TOP, string WHERE)
+        private string FormatCopyData(long ROWCOUNT, long TOP, string WHERE, string ORDERBY)
         {
             if (CopyOnlySchema)
             {
@@ -92,6 +101,11 @@ namespace Sql2SqlCloner
                 extradata += $", {WHERE.Trim()}";
             }
 
+            if (!string.IsNullOrEmpty(ORDERBY))
+            {
+                extradata += $", {ORDERBY.Trim()}";
+            }
+
             return extradata;
         }
 
@@ -99,6 +113,7 @@ namespace Sql2SqlCloner
         {
             WHERECONDITIONS = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
             TOPROWS = new Dictionary<string, long>(StringComparer.InvariantCultureIgnoreCase);
+            ORDERBYFIELDS = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
             var filterDataLoading = ConfigurationManager.AppSettings["FilterDataLoading"];
             if (!string.IsNullOrEmpty(filterDataLoading))
             {
@@ -116,6 +131,10 @@ namespace Sql2SqlCloner
                         {
                             TOPROWS[key] = toprows;
                         }
+                    }
+                    else if (split.Count > 2 && split[1].Equals("ORDER BY", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        ORDERBYFIELDS[key] = string.Join(" ", split.Skip(2));
                     }
                 }
             }
@@ -145,9 +164,10 @@ namespace Sql2SqlCloner
 
         private void LoadTreeNodes(bool sortByRecords)
         {
-            var nodes = treeView1.Nodes;
-            nodes.Clear();
-            var root = nodes.Add("All");
+            TreeNode[] nodesCopy = new TreeNode[treeView1.Nodes.Count];
+            treeView1.Nodes.CopyTo(nodesCopy, 0);
+            treeView1.Nodes.Clear();
+            var root = treeView1.Nodes.Add("All");
             var excludeObjectsList = new List<string>();
             var excludeDataLoadingList = new List<string>();
             try
@@ -170,7 +190,6 @@ namespace Sql2SqlCloner
             if (SelectOnlyTables)
             {
                 items = items.Where(i => i.Type == "Table");
-                btnNext.Text = "Continue";
             }
 
             //Tables should be shown at the first position
@@ -188,7 +207,27 @@ namespace Sql2SqlCloner
                 foreach (var currentitem in itemsCurrent)
                 {
                     var tn = child.Nodes.Add(currentitem.Name);
-                    tn.Checked = !CheckIfInList(currentitem.Name, excludeObjectsList);
+                    //restore previously checked/unchecked items
+                    bool? previousCheckedStatus = null;
+                    bool? previousCheckedStatusChild = null;
+                    if (nodesCopy.Any())
+                    {
+                        var itemTypeNode = nodesCopy[0].Nodes.OfType<TreeNode>().FirstOrDefault(f => f.Text.StartsWith($"{currentitemtype} "));
+                        if (itemTypeNode != default)
+                        {
+                            var currentItemTypeNode = itemTypeNode.Nodes.OfType<TreeNode>().FirstOrDefault(f => f.Text == currentitem.Name);
+                            if (currentItemTypeNode != default)
+                            {
+                                previousCheckedStatus = currentItemTypeNode.Checked;
+                                if (currentItemTypeNode.Nodes.Count == 1)
+                                {
+                                    previousCheckedStatusChild = currentItemTypeNode.Nodes[0].Checked;
+                                }
+                            }
+                        }
+                    }
+
+                    tn.Checked = previousCheckedStatus ?? !CheckIfInList(currentitem.Name, excludeObjectsList);
                     if (child.Text.StartsWith("Table"))
                     {
                         var currenttable = currentitem as SqlSchemaTable;
@@ -204,11 +243,17 @@ namespace Sql2SqlCloner
                             currenttable.TopRecords = TOP;
                         }
 
+                        ORDERBYFIELDS.TryGetValue(tn.Text, out string ORDERBY);
+                        if (!string.IsNullOrEmpty(ORDERBY))
+                        {
+                            currenttable.OrderByFields = ORDERBY.Trim();
+                        }
+
                         if (!SelectOnlyTables && CloseIfSuccess)
                         {
                             //When copying everything add a "Copy Data" subnode to tables
-                            var node = tn.Nodes.Add($"Copy Data{FormatCopyData(currenttable.RowCount, currenttable.TopRecords, currenttable.WhereFilter)}");
-                            node.Checked = tn.Checked && !CheckIfInList(currentitem.Name, excludeDataLoadingList) && CloseIfSuccess;
+                            var node = tn.Nodes.Add($"Copy Data{FormatCopyData(currenttable.RowCount, currenttable.TopRecords, currenttable.WhereFilter, currenttable.OrderByFields)}");
+                            node.Checked = previousCheckedStatusChild ?? tn.Checked && !CheckIfInList(currentitem.Name, excludeDataLoadingList) && CloseIfSuccess;
                             node.Tag = currentitem;
                         }
                         else
@@ -222,7 +267,7 @@ namespace Sql2SqlCloner
                                 tn.Checked = tn.Checked && !CheckIfInList(currentitem.Name, excludeDataLoadingList);
                             }
                             tn.Tag = currentitem;
-                            tn.Text += FormatCopyData(currenttable.RowCount, currenttable.TopRecords, currenttable.WhereFilter);
+                            tn.Text += FormatCopyData(currenttable.RowCount, currenttable.TopRecords, currenttable.WhereFilter, currenttable.OrderByFields);
                         }
                     }
                 }
@@ -232,7 +277,7 @@ namespace Sql2SqlCloner
                 }
             }
             root.ExpandAll();
-            treeView1.SelectedNode = nodes[0];
+            treeView1.SelectedNode = treeView1.Nodes[0];
         }
 
         private void treeView1_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
@@ -250,27 +295,6 @@ namespace Sql2SqlCloner
                 {
                     NodeContextMenu.Show(treeView1, e.Location);
                 }
-            }
-        }
-
-        private void MenuTop_Click(object sender, EventArgs e)
-        {
-            string defaultValue = CurrentTable.TopRecords.ToString();
-            if (new InputBoxValidate("Top records", "Enter top records to retrieve (0 for all)", true, icon: Icon)
-                    .ShowDialog(ref defaultValue) == DialogResult.OK)
-            {
-                CurrentTable.TopRecords = long.Parse(defaultValue);
-                if (CurrentTable.TopRecords < 0)
-                {
-                    CurrentTable.TopRecords = 0;
-                }
-
-                if (CurrentNode.Text.Contains(" ("))
-                {
-                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" (", StringComparison.Ordinal));
-                }
-
-                CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter);
             }
         }
 
@@ -295,7 +319,52 @@ namespace Sql2SqlCloner
                     CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" (", StringComparison.Ordinal));
                 }
 
-                CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter);
+                CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter, CurrentTable.OrderByFields);
+            }
+        }
+        private void MenuTop_Click(object sender, EventArgs e)
+        {
+            string defaultValue = CurrentTable.TopRecords.ToString();
+            if (new InputBoxValidate("Top records", "Enter top records to retrieve (0 for all)", true, icon: Icon)
+                    .ShowDialog(ref defaultValue) == DialogResult.OK)
+            {
+                CurrentTable.TopRecords = long.Parse(defaultValue);
+                if (CurrentTable.TopRecords < 0)
+                {
+                    CurrentTable.TopRecords = 0;
+                }
+
+                if (CurrentNode.Text.Contains(" ("))
+                {
+                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" (", StringComparison.Ordinal));
+                }
+
+                CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter, CurrentTable.OrderByFields);
+            }
+        }
+
+        private void MenuOrderBy_Click(object sender, EventArgs e)
+        {
+            var defaultValue = CurrentTable.OrderByFields;
+            if (new InputBoxValidate("Sort records", "Enter order by clause to sort records by", icon: Icon)
+                    .ShowDialog(ref defaultValue) == DialogResult.OK)
+            {
+                if (string.IsNullOrWhiteSpace(defaultValue))
+                {
+                    CurrentTable.OrderByFields = "";
+                }
+                else if (!defaultValue.StartsWith("ORDER BY", true, System.Globalization.CultureInfo.DefaultThreadCurrentCulture))
+                {
+                    defaultValue = $"ORDER BY {defaultValue}";
+                }
+
+                CurrentTable.OrderByFields = defaultValue;
+                if (CurrentNode.Text.Contains(" ("))
+                {
+                    CurrentNode.Text = CurrentNode.Text.Substring(0, CurrentNode.Text.IndexOf(" (", StringComparison.Ordinal));
+                }
+
+                CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter, CurrentTable.OrderByFields);
             }
         }
 
@@ -449,6 +518,7 @@ namespace Sql2SqlCloner
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
+            Visible = false;
             DialogResult = DialogResult.Abort;
             Environment.Exit(0);
         }
@@ -471,7 +541,7 @@ namespace Sql2SqlCloner
 
         private void ChooseSchemas_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (!NextClicked)
+            if (!NextClicked && DialogResult != DialogResult.Retry)
             {
                 DialogResult = DialogResult.Abort;
                 Environment.Exit(0);
@@ -526,6 +596,12 @@ namespace Sql2SqlCloner
         private void clearDestinationDatabase_CheckedChanged(object sender, EventArgs e)
         {
             dropAndRecreateObjects.Enabled = !clearDestinationDatabase.Checked;
+        }
+
+        private void btnBack_Click(object sender, EventArgs e)
+        {
+            DialogResult = DialogResult.Retry;
+            Close();
         }
     }
 }

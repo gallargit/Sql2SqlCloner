@@ -1,5 +1,5 @@
 # Sql2SqlCloner
-SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject.com/Articles/994806/SQL-Server-Database-Cloning-Tool-using-Csharp)
+SQL Server database cloning tool, based on [SqlDbCloner](https://www.codeproject.com/Articles/994806/SQL-Server-Database-Cloning-Tool-using-Csharp); built on .NET 4.8 platform
 
 # Features
 * Copy a SQL Server database from one server to another (schema and/or data). Many enhancements were made over the original tool. Works with SQL Server 2005 or greater.

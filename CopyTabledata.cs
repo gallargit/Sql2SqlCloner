@@ -18,7 +18,7 @@ namespace Sql2SqlCloner
 {
     public sealed partial class CopyTabledata : Form
     {
-        public IList<SqlDataObject> CopyList { get; }
+        public IList<SqlSchemaTable> CopyList { get; }
         private readonly SqlDataTransfer DataTransfer;
         private readonly SqlSchemaTransfer SchemaTransfer;
         private int currrow;
@@ -26,16 +26,18 @@ namespace Sql2SqlCloner
         private int percentage;
         private string currentlyCopying = "";
         private string lastError = "";
+        private readonly bool selectOnlyTables;
         private readonly DateTime? initialTime;
         private readonly object inProgress = new object();
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
         private readonly object objLock = new object();
 
-        public CopyTabledata(IList<SqlDataObject> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
+        public CopyTabledata(IList<SqlSchemaTable> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
             bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
         {
             this.initialTime = initialTime;
+            this.selectOnlyTables = selectOnlyTables;
             CopyList = list;
             var CopyRows = new ConcurrentBag<DataGridViewRow>();
             //show form while initializing
@@ -95,7 +97,7 @@ namespace Sql2SqlCloner
                 {
                     var lastRefresh = DateTime.Now;
                     var sublist = list.Skip(CURRENTTHREAD * (list.Count / NUMTHREADS))
-                        //last thread takes "the rest" of the items
+                        //last thread takes remaining items
                         .Take(CURRENTTHREAD == (NUMTHREADS - 1) ? list.Count : list.Count / NUMTHREADS);
 
                     foreach (var item in sublist)
@@ -128,15 +130,15 @@ namespace Sql2SqlCloner
                         var fields = " *";
                         if (convertCollation)
                         {
-                            var sourceTable = tabDictionarySource[item.Table];
+                            var sourceTable = tabDictionarySource[item.Name];
                             var selectList = new StringBuilder();
-                            if (!tabDictionaryDestination.ContainsKey(item.Table))
+                            if (!tabDictionaryDestination.ContainsKey(item.Name))
                             {
                                 fields = " *"; //table not found, will throw an error later
                             }
                             else
                             {
-                                var destinationTable = tabDictionaryDestination[item.Table];
+                                var destinationTable = tabDictionaryDestination[item.Name];
                                 foreach (Column col in sourceTable.Columns)
                                 {
                                     if (!col.Computed)
@@ -160,9 +162,9 @@ namespace Sql2SqlCloner
                             }
                         }
 
-                        var sql = $"SELECT{stritemTopRecords}{fields} FROM {item.Table} WITH(NOLOCK) {item.WhereFilter}";
+                        var sql = $"SELECT{stritemTopRecords}{fields} FROM {item.Name} WITH(NOLOCK) {item.WhereFilter} {item.OrderByFields}";
                         var row = (DataGridViewRow)dataGridView1.Rows[0].Clone();
-                        row.SetValues(Properties.Resources.empty, item.Table, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant(), itemTopRecords);
+                        row.SetValues(Properties.Resources.empty, item.Name, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant(), itemTopRecords);
                         CopyRows.Add(row);
                         if (CURRENTTHREAD == 0)
                         {
@@ -206,10 +208,12 @@ namespace Sql2SqlCloner
         {
             if (Properties.Settings.Default.ClearDestinationDatabase &&
                 ConfigurationManager.AppSettings["DeleteDatabaseDataConfirm"]?.Equals("true", StringComparison.InvariantCultureIgnoreCase) == true &&
+                (selectOnlyTables || ConfigurationManager.AppSettings["DeleteDatabaseConfirm"]?.Equals("true", StringComparison.InvariantCultureIgnoreCase) != true) &&
                 MessageBox.Show($"The data from database '{SchemaTransfer.DestinationCxInfo()}' is about to be deleted. Continue?",
                     "Database data deletion",
                     MessageBoxButtons.OKCancel) == DialogResult.Cancel)
             {
+                Visible = false;
                 DialogResult = DialogResult.Cancel;
                 Environment.Exit(0);
                 return;
@@ -250,7 +254,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     var tableName = item.Cells["Table"].Value.ToString();
-                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()}.{tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}' {currrow}/{dataGridView1.RowCount}";
+                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()} / {tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}' {currrow}/{dataGridView1.RowCount}";
                     if (item.Cells["TOP"].Value.ToString() != "0")
                     {
                         DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
@@ -403,7 +407,7 @@ namespace Sql2SqlCloner
             {
                 backgroundWorker1.CancelAsync();
             }
-
+            Visible = false;
             DialogResult = DialogResult.Abort;
             Environment.Exit(0);
         }

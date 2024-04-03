@@ -14,7 +14,7 @@ namespace Sql2SqlCloner.Components
 {
     public class SQLConnectionDialog : Form
     {
-        private readonly string[] controlsToCreate = new[] { "txtServer_Name", "lstAuthentication", "cboDatabase_Name", "txtUser_Name", "txtPassword", "chkTrust_Server_Certificate" };
+        private readonly string[] controlsToCreate = new[] { "txtServer_Name", "lstAuthentication", "txtUser_Name", "txtPassword", "cboDatabase_Name", "chkTrust_Server_Certificate" };
 
         public SQLConnectionDialog(Icon icon = null)
         {
@@ -93,12 +93,14 @@ namespace Sql2SqlCloner.Components
             }
             var buttonTest = new Button
             {
+                Name = "Test",
                 Text = "Test Connection"
             };
             buttonTest.Click += (s, e) => TestConnectionString();
             buttonTest.SetBounds(10, lstControls.Last().Top + 36, 120, 23);
             var buttonOk = new Button
             {
+                Name = nameof(DialogResult.OK),
                 Text = nameof(DialogResult.OK),
                 DialogResult = DialogResult.OK
             };
@@ -106,6 +108,7 @@ namespace Sql2SqlCloner.Components
             AcceptButton = buttonOk;
             var buttonCancel = new Button
             {
+                Name = nameof(DialogResult.Cancel),
                 Text = nameof(DialogResult.Cancel),
                 DialogResult = DialogResult.Cancel
             };
@@ -150,22 +153,14 @@ namespace Sql2SqlCloner.Components
                         {
                             var connectionString = "";
                             Invoke(new Action(() => connectionString = GetConnectionString()));
-                            var authSelectedIndex = 0;
-                            Invoke(new Action(() => authSelectedIndex = (Controls["Authentication"] as ComboBox).SelectedIndex));
-                            if (authSelectedIndex == 2)
-                            {
-                                var connectionStringItems = connectionString.Split(';').ToList();
-                                if (connectionString.Contains("ActiveDirectoryInteractive"))
-                                {
-                                    connectionStringItems = connectionStringItems.Where(c => c.IndexOf("initial catalog", StringComparison.OrdinalIgnoreCase) < 0).ToList();
-                                    connectionString = string.Join(";", connectionStringItems);
-                                }
-                            }
+                            var connectionStringItems = connectionString.Split(';').ToList();
+                            connectionStringItems = connectionStringItems.Where(c => c.IndexOf("initial catalog", StringComparison.OrdinalIgnoreCase) < 0).ToList();
+                            connectionString = string.Join(";", connectionStringItems);
                             if (!string.IsNullOrEmpty(connectionString))
                             {
                                 var sourceConnection = new ServerConnection
                                 {
-                                    ConnectionString = connectionString + ";Connection Timeout=1"
+                                    ConnectionString = $"{connectionString};Connection Timeout=1"
                                 };
                                 var server = new Server(sourceConnection);
                                 server.ConnectionContext.Connect();
@@ -236,9 +231,9 @@ namespace Sql2SqlCloner.Components
                     {
                         (Controls["Authentication"] as ComboBox).SelectedIndex = 1;
                     }
-                    if (fields.ContainsKey("User Id"))
+                    if (fields.ContainsKey("User ID"))
                     {
-                        Controls["User_Name"].Text = fields["User Id"];
+                        Controls["User_Name"].Text = fields["User ID"];
                     }
                     if (fields.ContainsKey("Password"))
                     {
@@ -268,13 +263,13 @@ namespace Sql2SqlCloner.Components
             }
             if (authentication == 1) //SQL Server
             {
-                builder["User Id"] = Controls["User_Name"].Text;
+                builder["User ID"] = Controls["User_Name"].Text;
                 builder["Password"] = Controls["Password"].Text;
             }
             if (authentication == 2) //Azure AD
             {
                 builder["Authentication"] = "Active Directory Interactive";
-                builder["User Id"] = Controls["User_Name"].Text;
+                builder["User ID"] = Controls["User_Name"].Text;
                 builder["Encrypt"] = "True"; // must be string, not boolean
             }
             return builder.ConnectionString;
@@ -286,15 +281,15 @@ namespace Sql2SqlCloner.Components
             try
             {
                 var builder = new SqlConnectionStringBuilder(connectionString);
-                result["Authentication"] = builder["Authentication"].ToString();
-                result["Initial Catalog"] = builder["Initial Catalog"].ToString();
-                result["Integrated Security"] = builder["Integrated Security"].ToString();
-                result["Data Source"] = builder["Data Source"].ToString();
-                result["TrustServerCertificate"] = builder["TrustServerCertificate"].ToString();
-                result["User Id"] = builder["User Id"].ToString();
-                result["Password"] = builder["Password"].ToString();
-                result["Encrypt"] = builder["Encrypt"].ToString();
-                result.Where(v => string.IsNullOrEmpty(v.Value)).ToList().ForEach(d => result.Remove(d.Key));
+                var defaultBuilder = new SqlConnectionStringBuilder();
+                foreach (var currentkey in builder.Keys)
+                {
+                    var key = currentkey.ToString();
+                    if (builder[key].ToString() != defaultBuilder[key].ToString())
+                    {
+                        result[key] = builder[key].ToString();
+                    }
+                }
             }
             catch { }
             return result;
@@ -302,8 +297,13 @@ namespace Sql2SqlCloner.Components
 
         private bool TestConnectionString()
         {
+            bool? result = null;
+            var enabledControls = Controls.OfType<Control>().Where(c => c.Enabled).ToList();
+            var originalText = Controls["Test"].Text;
             try
             {
+                Controls["Test"].Text = "Please Wait";
+                enabledControls.ForEach(c => c.Enabled = false);
                 var authSelectedIndex = (Controls["Authentication"] as ComboBox).SelectedIndex;
                 var cboDatabaseName = Controls["Database_Name"] as ComboBox;
                 var realDatabaseName = cboDatabaseName.Text;
@@ -333,18 +333,21 @@ namespace Sql2SqlCloner.Components
                     if (realDatabaseName?.Length == 0)
                     {
                         MessageBox.Show("The connection was successful but no database was selected", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return false;
+                        result = false;
                     }
                 }
                 catch { }
-                cboDatabaseName.Text = realDatabaseName;
-                var currentUserName = Controls["User_Name"].Text;
-                if (authSelectedIndex == 0)
+                if (result == null)
                 {
-                    currentUserName = SystemInformation.UserName;
+                    cboDatabaseName.Text = realDatabaseName;
+                    var currentUserName = Controls["User_Name"].Text;
+                    if (authSelectedIndex == 0)
+                    {
+                        currentUserName = SystemInformation.UserName;
+                    }
+                    MessageBox.Show($"Success connecting to: {serverInstance}/{realDatabaseName}", $"Connected as: {currentUserName}", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    result = true;
                 }
-                MessageBox.Show($"Success connecting to: {serverInstance + "." + realDatabaseName}", $"Connected as: {currentUserName}", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return true;
             }
             catch (Exception ex)
             {
@@ -357,7 +360,9 @@ namespace Sql2SqlCloner.Components
                 }
                 MessageBox.Show($"Error connecting to {Controls["Server_Name"].Text}: {errorMessage}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            return false;
+            enabledControls.ForEach(c => c.Enabled = true);
+            Controls["Test"].Text = originalText;
+            return result ?? false;
         }
 
         private void InitializeComponent()

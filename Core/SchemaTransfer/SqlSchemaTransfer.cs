@@ -2078,12 +2078,10 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             //destination server (property "transfer.Scripter" is always the source server, not the destination)
             //therefore instead of using the "this" object a new one is created and all of the drop operations
             //will be performed there
-            var transferDrop = new SqlSchemaTransfer(DestinationConnectionString, DestinationConnectionString, true,
-                    null, CancelToken)
+            var transferDrop = new SqlSchemaTransfer(DestinationConnectionString, DestinationConnectionString, true, null, CancelToken)
             { transfer = { CopyAllObjects = false } };
-            transferDrop.transfer.Options.ScriptDrops =
-                transferDrop.transfer.Options.IncludeIfNotExists =
-                    transferDrop.transfer.Options.ContinueScriptingOnError = true;
+            transferDrop.transfer.Options.ScriptDrops = transferDrop.transfer.Options.IncludeIfNotExists =
+                transferDrop.transfer.Options.ContinueScriptingOnError = true;
             transferDrop.ResetTransfer();
 
             //Restore default database principals if necessary
@@ -2106,14 +2104,12 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 //get tables with FKs and schemas
                 var producerTablesAndSchemas = Task.Run(() =>
                 {
-                    foreach (Table table in DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object)
-                                 .Cast<Table>())
+                    foreach (Table table in DestinationObjects.OfType<SqlSchemaTable>().Select(o => o.Object).Cast<Table>())
                     {
                         if (CancelToken.IsCancellationRequested)
                         {
                             return;
                         }
-
                         try
                         {
                             Monitor.Enter(lockFlag);
@@ -2127,7 +2123,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             catch
                             {
                             }
-
                             try
                             {
                                 if (table.GetTableProperty("IsMemoryOptimized"))
@@ -2138,7 +2133,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             catch
                             {
                             }
-
                             foreach (ForeignKey fk in table.ForeignKeys)
                             {
                                 destinations.Add(fk, CancelToken);
@@ -2148,10 +2142,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         {
                             Monitor.Exit(lockFlag);
                         }
-
                         destinations.Add(table, CancelToken);
                     }
-
                     //place schemas at the end
                     DestinationObjects.Select(o => o.Object).Where(p => p is Schema)
                         .ToList()
@@ -2164,8 +2156,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 using (var command = transferDrop.GetDestinationSqlCommand(sqlTimeout))
                 {
                     var processed = destinations.Count;
-
-                    var lastCallback = DateTime.Now.AddSeconds(1);
                     while (!destinations.IsAddingCompleted || processed > 0)
                     {
                         processed = 0;
@@ -2175,7 +2165,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             {
                                 return;
                             }
-
                             try
                             {
                                 transferDrop.transfer.ObjectList.Clear();
@@ -2185,14 +2174,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                     command.CommandText = scriptRun;
                                     command.ExecuteNonQuery();
                                     processed++;
-                                    if (producerTablesAndSchemas.Status != TaskStatus.Running ||
-                                        lastCallback < DateTime.Now.AddSeconds(-0.5))
-                                    {
-                                        Monitor.Enter(lockFlag);
-                                        mainContext.DoCallBack(() => callback?.Invoke(obj));
-                                        Monitor.Exit(lockFlag);
-                                        lastCallback = DateTime.Now;
-                                    }
+                                    Monitor.Enter(lockFlag);
+                                    mainContext.DoCallBack(() => callback?.Invoke(obj));
+                                    Monitor.Exit(lockFlag);
                                 }
                             }
                             catch (Exception ex)
@@ -2201,7 +2185,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                                 {
                                     lastError = $". {ex.Message} Affected object: {obj.Name}";
                                 }
-
                                 if (!retrylist.Contains(obj))
                                 {
                                     retrylist.Add(obj);
@@ -2266,12 +2249,12 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
         public string SourceCxInfo()
         {
-            return $"{FormatInstance(SourceConnection.ServerInstance.Replace("ADMIN:", ""))}.{SourceDatabaseName}";
+            return $"{FormatInstance(SourceConnection.ServerInstance.Replace("ADMIN:", ""))}/{SourceDatabaseName}";
         }
 
         public string DestinationCxInfo()
         {
-            return $"{FormatInstance(DestinationConnection.ServerInstance)}.{DestinationDatabaseName}";
+            return $"{FormatInstance(DestinationConnection.ServerInstance)}/{DestinationDatabaseName}";
         }
     }
 }

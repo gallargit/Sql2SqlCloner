@@ -5,6 +5,8 @@
 
 using System.Diagnostics.CodeAnalysis;
 
+[assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopySchema.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]
+[assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]
 [assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.Core.SchemaTransfer.SqlSchemaTransfer.RemoveSchemaBindingFromDestination")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.btnCancel_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.btnDestination_Click(System.Object,System.EventArgs)")]
@@ -12,11 +14,14 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.btnSource_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.txtDestination_TextChanged(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseConnections.txtSource_TextChanged(System.Object,System.EventArgs)")]
+[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.btnBack_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.btnCancel_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.btnNext_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.btnSelectSchema_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.btnSortNodesBy_Click(System.Object,System.EventArgs)")]
+[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.clearDestinationDatabase_CheckedChanged(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.copyConstraints_CheckedChanged(System.Object,System.EventArgs)")]
+[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.deleteDestinationTables_CheckedChanged(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.treeView1_AfterCheck(System.Object,System.Windows.Forms.TreeViewEventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.treeView1_NodeMouseClick(System.Object,System.Windows.Forms.TreeNodeMouseClickEventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopySchema.autoScrollGrid_CheckedChanged(System.Object,System.EventArgs)")]
@@ -39,7 +44,3 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.btnPause_Click(System.Object,System.EventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]
 [assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_DataError(System.Object,System.Windows.Forms.DataGridViewDataErrorEventArgs)")]
-[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.deleteDestinationTables_CheckedChanged(System.Object,System.EventArgs)")]
-[assembly: SuppressMessage("Style", "IDE1006:Naming Styles", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.ChooseSchemas.clearDestinationDatabase_CheckedChanged(System.Object,System.EventArgs)")]
-[assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopyTabledata.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]
-[assembly: SuppressMessage("Roslynator", "RCS1202:Avoid NullReferenceException.", Justification = "<Pending>", Scope = "member", Target = "~M:Sql2SqlCloner.CopySchema.dataGridView1_CellDoubleClick(System.Object,System.Windows.Forms.DataGridViewCellEventArgs)")]

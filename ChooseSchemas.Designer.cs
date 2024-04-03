@@ -54,6 +54,7 @@ namespace Sql2SqlCloner
             this.label3 = new System.Windows.Forms.Label();
             this.optionsBoxData = new System.Windows.Forms.FlowLayoutPanel();
             this.incrementalDataCopy = new System.Windows.Forms.CheckBox();
+            this.btnBack = new System.Windows.Forms.Button();
             this.treeView1 = new Sql2SqlCloner.Components.TriStateTreeView();
             this.optionsBoxSchema.SuspendLayout();
             this.optionsBoxData.SuspendLayout();
@@ -62,10 +63,10 @@ namespace Sql2SqlCloner
             // btnNext
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnNext.Location = new System.Drawing.Point(508, 278);
+            this.btnNext.Location = new System.Drawing.Point(560, 278);
             this.btnNext.Name = "btnNext";
-            this.btnNext.Size = new System.Drawing.Size(75, 23);
-            this.btnNext.TabIndex = 14;
+            this.btnNext.Size = new System.Drawing.Size(52, 23);
+            this.btnNext.TabIndex = 17;
             this.btnNext.Text = "Next";
             this.btnNext.UseVisualStyleBackColor = true;
             this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
@@ -74,10 +75,10 @@ namespace Sql2SqlCloner
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(599, 278);
+            this.btnCancel.Location = new System.Drawing.Point(617, 278);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(75, 23);
-            this.btnCancel.TabIndex = 15;
+            this.btnCancel.Size = new System.Drawing.Size(60, 23);
+            this.btnCancel.TabIndex = 18;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
@@ -97,7 +98,7 @@ namespace Sql2SqlCloner
             this.btnSelectSchema.Location = new System.Drawing.Point(408, 2);
             this.btnSelectSchema.Name = "btnSelectSchema";
             this.btnSelectSchema.Size = new System.Drawing.Size(93, 26);
-            this.btnSelectSchema.TabIndex = 16;
+            this.btnSelectSchema.TabIndex = 20;
             this.btnSelectSchema.Text = "Select schemas";
             this.btnSelectSchema.UseVisualStyleBackColor = true;
             this.btnSelectSchema.Click += new System.EventHandler(this.btnSelectSchema_Click);
@@ -108,7 +109,7 @@ namespace Sql2SqlCloner
             this.btnSortNodesBy.Location = new System.Drawing.Point(315, 2);
             this.btnSortNodesBy.Name = "btnSortNodesBy";
             this.btnSortNodesBy.Size = new System.Drawing.Size(87, 26);
-            this.btnSortNodesBy.TabIndex = 15;
+            this.btnSortNodesBy.TabIndex = 19;
             this.btnSortNodesBy.Text = "Sort by records";
             this.btnSortNodesBy.UseVisualStyleBackColor = true;
             this.btnSortNodesBy.Click += new System.EventHandler(this.btnSortNodesBy_Click);
@@ -131,7 +132,7 @@ namespace Sql2SqlCloner
             this.copyCollation.Margin = new System.Windows.Forms.Padding(2);
             this.copyCollation.Name = "copyCollation";
             this.copyCollation.Size = new System.Drawing.Size(172, 21);
-            this.copyCollation.TabIndex = 13;
+            this.copyCollation.TabIndex = 15;
             // 
             // disableNotForReplication
             // 
@@ -307,7 +308,7 @@ namespace Sql2SqlCloner
             this.deleteDestinationTables.Margin = new System.Windows.Forms.Padding(2);
             this.deleteDestinationTables.Name = "deleteDestinationTables";
             this.deleteDestinationTables.Size = new System.Drawing.Size(142, 17);
-            this.deleteDestinationTables.TabIndex = 1;
+            this.deleteDestinationTables.TabIndex = 13;
             this.deleteDestinationTables.Text = "Delete destination tables";
             this.deleteDestinationTables.UseVisualStyleBackColor = true;
             this.deleteDestinationTables.CheckedChanged += new System.EventHandler(this.deleteDestinationTables_CheckedChanged);
@@ -332,7 +333,7 @@ namespace Sql2SqlCloner
             this.optionsBoxData.Location = new System.Drawing.Point(506, 2);
             this.optionsBoxData.Name = "optionsBoxData";
             this.optionsBoxData.Size = new System.Drawing.Size(177, 232);
-            this.optionsBoxData.TabIndex = 23;
+            this.optionsBoxData.TabIndex = 13;
             this.optionsBoxData.Visible = false;
             // 
             // incrementalDataCopy
@@ -343,9 +344,20 @@ namespace Sql2SqlCloner
             this.incrementalDataCopy.Margin = new System.Windows.Forms.Padding(2);
             this.incrementalDataCopy.Name = "incrementalDataCopy";
             this.incrementalDataCopy.Size = new System.Drawing.Size(131, 17);
-            this.incrementalDataCopy.TabIndex = 2;
+            this.incrementalDataCopy.TabIndex = 14;
             this.incrementalDataCopy.Text = "Incremental data copy";
             this.incrementalDataCopy.UseVisualStyleBackColor = true;
+            // 
+            // btnBack
+            // 
+            this.btnBack.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnBack.Location = new System.Drawing.Point(503, 278);
+            this.btnBack.Name = "btnBack";
+            this.btnBack.Size = new System.Drawing.Size(52, 23);
+            this.btnBack.TabIndex = 16;
+            this.btnBack.Text = "Back";
+            this.btnBack.UseVisualStyleBackColor = true;
+            this.btnBack.Click += new System.EventHandler(this.btnBack_Click);
             // 
             // treeView1
             // 
@@ -353,7 +365,7 @@ namespace Sql2SqlCloner
             | System.Windows.Forms.AnchorStyles.Left)));
             this.treeView1.Location = new System.Drawing.Point(10, 28);
             this.treeView1.Name = "treeView1";
-            this.treeView1.Size = new System.Drawing.Size(490, 272);
+            this.treeView1.Size = new System.Drawing.Size(487, 272);
             this.treeView1.TabIndex = 0;
             this.treeView1.TriStateStyleProperty = Sql2SqlCloner.Components.TriStateTreeView.TriStateStyles.Standard;
             this.treeView1.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.treeView1_AfterCheck);
@@ -364,6 +376,7 @@ namespace Sql2SqlCloner
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(684, 311);
+            this.Controls.Add(this.btnBack);
             this.Controls.Add(this.optionsBoxData);
             this.Controls.Add(this.lblCopyCollation);
             this.Controls.Add(this.copyCollation);
@@ -416,5 +429,6 @@ namespace Sql2SqlCloner
         private System.Windows.Forms.FlowLayoutPanel optionsBoxData;
         private System.Windows.Forms.CheckBox ignoreFileGroup;
         private System.Windows.Forms.CheckBox incrementalDataCopy;
+        private System.Windows.Forms.Button btnBack;
     }
 }
