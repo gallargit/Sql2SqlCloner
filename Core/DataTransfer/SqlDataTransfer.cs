@@ -3,7 +3,6 @@ using Microsoft.SqlServer.Management.Common;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Data;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -165,8 +164,8 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     AND ISNULL(COLUMNPROPERTY(tab.OBJECT_ID,col.name,'GeneratedAlwaysType'),0)=0 --exclude generated columns
                     ORDER BY sche.name,tab.name,col.column_id";
                 var tablesplit = tableName.Split('.');
-                command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
-                command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
+                command.Parameters.Add("@schema", System.Data.SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
+                command.Parameters.Add("@table", System.Data.SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
                 var lst = new List<string>();
                 using (var reader = command.ExecuteReader())
                 {
@@ -228,8 +227,8 @@ namespace Sql2SqlCloner.Core.DataTransfer
                             WHERE sche.name=@schema AND tab.name=@table
                         )";
                     var tablesplit = tableName.Split('.');
-                    command.Parameters.Add("@schema", SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
-                    command.Parameters.Add("@table", SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
+                    command.Parameters.Add("@schema", System.Data.SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
+                    command.Parameters.Add("@table", System.Data.SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
                     using (var reader = command.ExecuteReader())
                     {
                         if (reader.Read())

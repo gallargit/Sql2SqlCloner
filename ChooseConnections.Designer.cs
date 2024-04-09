@@ -46,7 +46,7 @@
             // 
             this.txtSource.Location = new System.Drawing.Point(12, 61);
             this.txtSource.Name = "txtSource";
-            this.txtSource.Size = new System.Drawing.Size(431, 20);
+            this.txtSource.Size = new System.Drawing.Size(422, 20);
             this.txtSource.TabIndex = 1;
             this.txtSource.TextChanged += new System.EventHandler(this.txtSource_TextChanged);
             // 
@@ -54,7 +54,7 @@
             // 
             this.txtDestination.Location = new System.Drawing.Point(12, 112);
             this.txtDestination.Name = "txtDestination";
-            this.txtDestination.Size = new System.Drawing.Size(431, 20);
+            this.txtDestination.Size = new System.Drawing.Size(422, 20);
             this.txtDestination.TabIndex = 3;
             this.txtDestination.TextChanged += new System.EventHandler(this.txtDestination_TextChanged);
             // 
@@ -78,7 +78,7 @@
             // 
             // btnSource
             // 
-            this.btnSource.Location = new System.Drawing.Point(450, 59);
+            this.btnSource.Location = new System.Drawing.Point(440, 58);
             this.btnSource.Name = "btnSource";
             this.btnSource.Size = new System.Drawing.Size(75, 23);
             this.btnSource.TabIndex = 2;
@@ -88,7 +88,7 @@
             // 
             // btnDestination
             // 
-            this.btnDestination.Location = new System.Drawing.Point(449, 109);
+            this.btnDestination.Location = new System.Drawing.Point(440, 109);
             this.btnDestination.Name = "btnDestination";
             this.btnDestination.Size = new System.Drawing.Size(75, 23);
             this.btnDestination.TabIndex = 4;
@@ -98,20 +98,20 @@
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(449, 218);
+            this.btnCancel.Location = new System.Drawing.Point(359, 218);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(75, 23);
-            this.btnCancel.TabIndex = 10;
+            this.btnCancel.TabIndex = 9;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
             // btnNext
             // 
-            this.btnNext.Location = new System.Drawing.Point(368, 218);
+            this.btnNext.Location = new System.Drawing.Point(440, 218);
             this.btnNext.Name = "btnNext";
             this.btnNext.Size = new System.Drawing.Size(75, 23);
-            this.btnNext.TabIndex = 9;
+            this.btnNext.TabIndex = 10;
             this.btnNext.Text = "Next";
             this.btnNext.UseVisualStyleBackColor = true;
             this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
@@ -127,6 +127,7 @@
             this.isSchema.TabIndex = 5;
             this.isSchema.Text = "Copy Schema";
             this.isSchema.UseVisualStyleBackColor = true;
+            this.isSchema.CheckedChanged += new System.EventHandler(this.isSchema_CheckedChanged);
             // 
             // isData
             // 
@@ -157,7 +158,7 @@
             this.decryptObjects.AutoSize = true;
             this.decryptObjects.Checked = true;
             this.decryptObjects.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.decryptObjects.Location = new System.Drawing.Point(325, 153);
+            this.decryptObjects.Location = new System.Drawing.Point(306, 153);
             this.decryptObjects.Name = "decryptObjects";
             this.decryptObjects.Size = new System.Drawing.Size(209, 17);
             this.decryptObjects.TabIndex = 8;
@@ -168,7 +169,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(546, 261);
+            this.ClientSize = new System.Drawing.Size(534, 261);
             this.Controls.Add(this.decryptObjects);
             this.Controls.Add(this.lblPleaseWait);
             this.Controls.Add(this.isData);

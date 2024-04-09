@@ -53,10 +53,10 @@
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnNext.Enabled = false;
-            this.btnNext.Location = new System.Drawing.Point(516, 276);
+            this.btnNext.Location = new System.Drawing.Point(597, 276);
             this.btnNext.Name = "btnNext";
             this.btnNext.Size = new System.Drawing.Size(75, 23);
-            this.btnNext.TabIndex = 3;
+            this.btnNext.TabIndex = 4;
             this.btnNext.Text = "Copy";
             this.btnNext.UseVisualStyleBackColor = true;
             this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
@@ -84,10 +84,10 @@
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.Enabled = false;
-            this.btnCancel.Location = new System.Drawing.Point(598, 276);
+            this.btnCancel.Location = new System.Drawing.Point(517, 276);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(74, 23);
-            this.btnCancel.TabIndex = 5;
+            this.btnCancel.Size = new System.Drawing.Size(72, 23);
+            this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
@@ -131,6 +131,7 @@
             this.dataGridView1.TabIndex = 0;
             this.dataGridView1.CellDoubleClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dataGridView1_CellDoubleClick);
             this.dataGridView1.DataError += new System.Windows.Forms.DataGridViewDataErrorEventHandler(this.dataGridView1_DataError);
+            this.dataGridView1.SortCompare += new System.Windows.Forms.DataGridViewSortCompareEventHandler(this.dataGridView1_SortCompare);
             // 
             // Status
             // 
@@ -189,9 +190,9 @@
             // 
             this.btnCopyMessages.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCopyMessages.Enabled = false;
-            this.btnCopyMessages.Location = new System.Drawing.Point(346, 276);
+            this.btnCopyMessages.Location = new System.Drawing.Point(330, 276);
             this.btnCopyMessages.Name = "btnCopyMessages";
-            this.btnCopyMessages.Size = new System.Drawing.Size(95, 23);
+            this.btnCopyMessages.Size = new System.Drawing.Size(101, 23);
             this.btnCopyMessages.TabIndex = 1;
             this.btnCopyMessages.Text = "Copy messages";
             this.btnCopyMessages.UseVisualStyleBackColor = true;
@@ -202,9 +203,9 @@
             // 
             this.btnPause.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnPause.Enabled = false;
-            this.btnPause.Location = new System.Drawing.Point(446, 276);
+            this.btnPause.Location = new System.Drawing.Point(437, 276);
             this.btnPause.Name = "btnPause";
-            this.btnPause.Size = new System.Drawing.Size(64, 23);
+            this.btnPause.Size = new System.Drawing.Size(73, 23);
             this.btnPause.TabIndex = 2;
             this.btnPause.Text = "Pause";
             this.btnPause.UseVisualStyleBackColor = true;
@@ -240,7 +241,7 @@
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "CopyTabledata";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "Sql2SqlCloner - Copy Data";
             this.Load += new System.EventHandler(this.CopyTabledata_Load);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();

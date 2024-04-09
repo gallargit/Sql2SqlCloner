@@ -69,10 +69,10 @@
             // btnNext
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnNext.Location = new System.Drawing.Point(516, 276);
+            this.btnNext.Location = new System.Drawing.Point(597, 276);
             this.btnNext.Name = "btnNext";
             this.btnNext.Size = new System.Drawing.Size(75, 23);
-            this.btnNext.TabIndex = 3;
+            this.btnNext.TabIndex = 4;
             this.btnNext.Text = "Copy";
             this.btnNext.UseVisualStyleBackColor = true;
             this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
@@ -99,10 +99,10 @@
             // btnCancel
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancel.Location = new System.Drawing.Point(598, 276);
+            this.btnCancel.Location = new System.Drawing.Point(517, 276);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(74, 23);
-            this.btnCancel.TabIndex = 4;
+            this.btnCancel.Size = new System.Drawing.Size(72, 23);
+            this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
@@ -177,7 +177,7 @@
             this.MinimizeBox = false;
             this.Name = "CopySchema";
             this.Padding = new System.Windows.Forms.Padding(3, 0, 3, 0);
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "Sql2SqlCloner - Copy Schema";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.CopySchema_FormClosing);
             this.Load += new System.EventHandler(this.CopySchema_Load);

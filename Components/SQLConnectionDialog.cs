@@ -12,6 +12,15 @@ using System.Windows.Forms;
 
 namespace Sql2SqlCloner.Components
 {
+    enum AuthenticationMethod
+    {
+        Windows,
+        SQL_Server,
+        Active_Directory_Interactive,
+        Active_Directory_Password,
+        Active_Directory_Integrated
+    }
+
     public class SQLConnectionDialog : Form
     {
         private readonly string[] controlsToCreate = new[] { "txtServer_Name", "lstAuthentication", "txtUser_Name", "txtPassword", "cboDatabase_Name", "chkTrust_Server_Certificate" };
@@ -53,14 +62,16 @@ namespace Sql2SqlCloner.Components
                     {
                         DropDownStyle = ComboBoxStyle.DropDownList
                     };
-                    objCombo.Items.Add("Windows");
-                    objCombo.Items.Add("SQL Server");
-                    objCombo.Items.Add("Azure AD");
-                    objCombo.SelectedIndex = 0;
+                    foreach (var auth in Enum.GetValues(typeof(AuthenticationMethod)))
+                    {
+                        objCombo.Items.Add(auth.ToString().Replace("_", " "));
+                    }
+                    objCombo.SelectedIndex = (int)AuthenticationMethod.Windows;
                     objCombo.SelectedIndexChanged += (s, e) =>
                     {
-                        Controls["User_Name"].Enabled = objCombo.SelectedIndex != 0;
-                        Controls["Password"].Enabled = objCombo.SelectedIndex == 1;
+                        var selectedAuth = (AuthenticationMethod)(Controls["Authentication"] as ComboBox).SelectedIndex;
+                        Controls["User_Name"].Enabled = selectedAuth != AuthenticationMethod.Windows && selectedAuth != AuthenticationMethod.Active_Directory_Integrated;
+                        Controls["Password"].Enabled = selectedAuth == AuthenticationMethod.SQL_Server || selectedAuth == AuthenticationMethod.Active_Directory_Password;
                     };
                     objCombo.SelectedIndexChanged += (s, e) => TryFillDatabases(false);
                     objControl = objCombo;
@@ -128,9 +139,10 @@ namespace Sql2SqlCloner.Components
 
         private bool IsDataFilledOK()
         {
+            var selectedAuth = (AuthenticationMethod)(Controls["Authentication"] as ComboBox).SelectedIndex;
             return !string.IsNullOrEmpty(Controls["Server_Name"].Text) && (
-                (Controls["Authentication"] as ComboBox).SelectedIndex == 0 ||
-                ((Controls["Authentication"] as ComboBox).SelectedIndex == 1 && !string.IsNullOrEmpty(Controls["User_Name"].Text) && !string.IsNullOrEmpty(Controls["Password"].Text))
+                (selectedAuth == AuthenticationMethod.Windows) ||
+                ((selectedAuth == AuthenticationMethod.SQL_Server) && !string.IsNullOrEmpty(Controls["User_Name"].Text) && !string.IsNullOrEmpty(Controls["Password"].Text))
             );
         }
 
@@ -219,17 +231,25 @@ namespace Sql2SqlCloner.Components
                 }
                 if (fields.ContainsKey("Integrated Security") && string.Equals(fields["Integrated Security"], "true", StringComparison.OrdinalIgnoreCase))
                 {
-                    (Controls["Authentication"] as ComboBox).SelectedIndex = 0;
+                    (Controls["Authentication"] as ComboBox).SelectedIndex = (int)AuthenticationMethod.Windows;
                 }
                 else
                 {
                     if (fields.ContainsKey("Authentication") && fields["Authentication"] == "ActiveDirectoryInteractive")
                     {
-                        (Controls["Authentication"] as ComboBox).SelectedIndex = 2;
+                        (Controls["Authentication"] as ComboBox).SelectedIndex = (int)AuthenticationMethod.Active_Directory_Interactive;
+                    }
+                    else if (fields.ContainsKey("Authentication") && fields["Authentication"] == "ActiveDirectoryPassword")
+                    {
+                        (Controls["Authentication"] as ComboBox).SelectedIndex = (int)AuthenticationMethod.Active_Directory_Password;
+                    }
+                    else if (fields.ContainsKey("Authentication") && fields["Authentication"] == "ActiveDirectoryIntegrated")
+                    {
+                        (Controls["Authentication"] as ComboBox).SelectedIndex = (int)AuthenticationMethod.Active_Directory_Integrated;
                     }
                     else
                     {
-                        (Controls["Authentication"] as ComboBox).SelectedIndex = 1;
+                        (Controls["Authentication"] as ComboBox).SelectedIndex = (int)AuthenticationMethod.SQL_Server;
                     }
                     if (fields.ContainsKey("User ID"))
                     {
@@ -252,25 +272,39 @@ namespace Sql2SqlCloner.Components
         private string GetConnectionString()
         {
             var builder = new SqlConnectionStringBuilder();
-            var authentication = (Controls["Authentication"] as ComboBox).SelectedIndex;
+            var selectedAuth = (AuthenticationMethod)(Controls["Authentication"] as ComboBox).SelectedIndex;
 
-            builder["Data Source"] = Controls["Server_Name"].Text;
-            builder["Initial Catalog"] = Controls["Database_Name"].Text;
-            builder["TrustServerCertificate"] = (Controls["Trust_Server_Certificate"] as CheckBox).Checked;
-            if (authentication == 0) //Windows
+            builder.DataSource = Controls["Server_Name"].Text;
+            builder.InitialCatalog = Controls["Database_Name"].Text;
+            builder.TrustServerCertificate = (Controls["Trust_Server_Certificate"] as CheckBox).Checked;
+            if (selectedAuth == AuthenticationMethod.Windows)
             {
-                builder["Integrated Security"] = true;
+                builder.IntegratedSecurity = true;
+                builder.Encrypt = SqlConnectionEncryptOption.Optional;
             }
-            if (authentication == 1) //SQL Server
+            if (selectedAuth == AuthenticationMethod.SQL_Server)
             {
-                builder["User ID"] = Controls["User_Name"].Text;
-                builder["Password"] = Controls["Password"].Text;
+                builder.UserID = Controls["User_Name"].Text;
+                builder.Password = Controls["Password"].Text;
+                builder.Encrypt = SqlConnectionEncryptOption.Optional;
             }
-            if (authentication == 2) //Azure AD
+            if (selectedAuth == AuthenticationMethod.Active_Directory_Interactive)
             {
-                builder["Authentication"] = "Active Directory Interactive";
-                builder["User ID"] = Controls["User_Name"].Text;
-                builder["Encrypt"] = "True"; // must be string, not boolean
+                builder.Authentication = SqlAuthenticationMethod.ActiveDirectoryInteractive;
+                builder.UserID = Controls["User_Name"].Text;
+                builder.Encrypt = SqlConnectionEncryptOption.Strict;
+            }
+            if (selectedAuth == AuthenticationMethod.Active_Directory_Password)
+            {
+                builder.Authentication = SqlAuthenticationMethod.ActiveDirectoryPassword;
+                builder.UserID = Controls["User_Name"].Text;
+                builder.Password = Controls["Password"].Text;
+                builder.Encrypt = SqlConnectionEncryptOption.Strict;
+            }
+            if (selectedAuth == AuthenticationMethod.Active_Directory_Integrated)
+            {
+                builder.Authentication = SqlAuthenticationMethod.ActiveDirectoryIntegrated;
+                builder.Encrypt = SqlConnectionEncryptOption.Strict;
             }
             return builder.ConnectionString;
         }
@@ -304,7 +338,7 @@ namespace Sql2SqlCloner.Components
             {
                 Controls["Test"].Text = "Please Wait";
                 enabledControls.ForEach(c => c.Enabled = false);
-                var authSelectedIndex = (Controls["Authentication"] as ComboBox).SelectedIndex;
+                var selectedAuth = (AuthenticationMethod)(Controls["Authentication"] as ComboBox).SelectedIndex;
                 var cboDatabaseName = Controls["Database_Name"] as ComboBox;
                 var realDatabaseName = cboDatabaseName.Text;
                 var serverConnection = new ServerConnection(new SqlConnection(GetConnectionString()));
@@ -341,7 +375,7 @@ namespace Sql2SqlCloner.Components
                 {
                     cboDatabaseName.Text = realDatabaseName;
                     var currentUserName = Controls["User_Name"].Text;
-                    if (authSelectedIndex == 0)
+                    if (selectedAuth == AuthenticationMethod.Windows || selectedAuth == AuthenticationMethod.Active_Directory_Integrated)
                     {
                         currentUserName = SystemInformation.UserName;
                     }

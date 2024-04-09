@@ -63,10 +63,10 @@ namespace Sql2SqlCloner
             // btnNext
             // 
             this.btnNext.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnNext.Location = new System.Drawing.Point(560, 278);
+            this.btnNext.Location = new System.Drawing.Point(625, 278);
             this.btnNext.Name = "btnNext";
             this.btnNext.Size = new System.Drawing.Size(52, 23);
-            this.btnNext.TabIndex = 17;
+            this.btnNext.TabIndex = 18;
             this.btnNext.Text = "Next";
             this.btnNext.UseVisualStyleBackColor = true;
             this.btnNext.Click += new System.EventHandler(this.btnNext_Click);
@@ -75,10 +75,10 @@ namespace Sql2SqlCloner
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(617, 278);
+            this.btnCancel.Location = new System.Drawing.Point(561, 278);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(60, 23);
-            this.btnCancel.TabIndex = 18;
+            this.btnCancel.Size = new System.Drawing.Size(58, 23);
+            this.btnCancel.TabIndex = 17;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
             this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
@@ -390,10 +390,11 @@ namespace Sql2SqlCloner
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "ChooseSchemas";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.Manual;
             this.Text = "Sql2SqlCloner - Schema";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.ChooseSchemas_FormClosing);
             this.Load += new System.EventHandler(this.ChooseSchemas_Load);
+            this.Shown += new System.EventHandler(this.ChooseSchemas_Shown);
             this.optionsBoxSchema.ResumeLayout(false);
             this.optionsBoxSchema.PerformLayout();
             this.optionsBoxData.ResumeLayout(false);

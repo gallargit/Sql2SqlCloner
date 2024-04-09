@@ -48,7 +48,8 @@ These two DLLs should be copied at build time, according to these two lines in t
 
 My guess is that the first time they are not copied because the packages have not been downloaded yet, and I could not figure out a way to force package download. If you first build; then rebuild the project, they will be copied and everything will work. But since this is annoying and inconvenient a quick workaround has been made in the `Loader.cs` file. If the DLLs are not present, they will be copied at runtime from the `packages` folder.
 
-- Packages Microsoft.SqlServer.SqlManagementObjects, Microsoft.Data.SqlClient and Microsoft.Data.SqlClient.SNI version 5.1.x break compatibility with SQL Server 2005, hence they will not be updated. As Microsoft.SqlServer.SqlManagementObjects is dependent on them, it won't be updated as well
+- Packages Microsoft.SqlServer.SqlManagementObjects, Microsoft.Data.SqlClient and Microsoft.Data.SqlClient.SNI version 5.1.x break compatibility with SQL Server 2005, hence they will not be updated. As Microsoft.SqlServer.SqlManagementObjects is dependent on them, it won't be updated as well.
+  When updated the TLS library defaults to 1.2, which is not supported by older SQL versions, throwing the following error: A connection was successfully established with the server, but then an error occurred during the login process. (provider: SSL Provider, error: 0 - An existing connection was forcibly closed by the remote host.
 
 # New Experimental Features
 * Ability to decrypt encrypted objects using DAC connection. Triggers and functions do not work.
@@ -56,5 +57,5 @@ My guess is that the first time they are not copied because the packages have no
 * Incremental data copy (available when copying data only)
 
 # To be done
-* Decrypt and re-encrypt columns as seen [here](https://learn.microsoft.com/en-us/sql/t-sql/functions/decryptbykey-transact-sql?view=sql-server-ver16)
+* Decrypt and re-encrypt columns as seen [here](https://learn.microsoft.com/en-us/sql/t-sql/functions/decryptbykey-transact-sql?view=sql-server-ver16) (ColumnEncryptionSetting)
  

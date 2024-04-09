@@ -2,18 +2,10 @@
 {
     public class SqlSchemaTable : SqlSchemaObject
     {
-        public long RowCount { get; set; }
-        public long TopRecords { get; set; }
+        public long RowCount { get; set; } = 0;
+        public long TopRecords { get; set; } = 0;
         public string WhereFilter { get; set; }
         public string OrderByFields { get; set; }
         public bool HasRelationships { get; set; }
-
-        public SqlSchemaTable()
-        {
-            HasRelationships = false;
-            RowCount = TopRecords = 0;
-            WhereFilter = null;
-            OrderByFields = null;
-        }
     }
 }

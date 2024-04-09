@@ -1,5 +1,6 @@
 ﻿using Microsoft.SqlServer.Management.Smo;
 using System.Drawing;
+using System.Linq;
 
 namespace Sql2SqlCloner.Core.SchemaTransfer
 {
@@ -13,5 +14,28 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         public string Error { get; set; }
         [System.ComponentModel.Browsable(false)]
         public SqlSchemaObject Parent { get; set; }
+        [System.ComponentModel.Browsable(false)]
+        public string NameWithBrackets
+        {
+            get
+            {
+                var itemWithBrackets = "";
+                Name.Split('.').ToList().ForEach(itemSplitDot =>
+                    itemWithBrackets += ((itemWithBrackets != "") ? "." : "") +
+                        (itemSplitDot.StartsWith("[") ? "" : "[") +
+                        itemSplitDot +
+                        (itemSplitDot.EndsWith("]") ? "" : "]"));
+
+                return itemWithBrackets;
+            }
+        }
+        [System.ComponentModel.Browsable(false)]
+        public string NameWithoutBrackets
+        {
+            get
+            {
+                return Name.Replace("[", "").Replace("]", "");
+            }
+        }
     }
 }

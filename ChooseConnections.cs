@@ -1,10 +1,11 @@
-﻿using Sql2SqlCloner.Components;
+﻿using Microsoft.Data.ConnectionUI;
+using Microsoft.Data.SqlClient;
+using Sql2SqlCloner.Components;
 using Sql2SqlCloner.Core.DataTransfer;
 using Sql2SqlCloner.Core.SchemaTransfer;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Data.Common;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -23,6 +24,7 @@ namespace Sql2SqlCloner
         private readonly CancellationTokenSource tokenSource = new CancellationTokenSource();
         private CancellationToken cancelToken;
         private const string TrustServerCertificateDesc = "TrustServerCertificate";
+        private Point originalLocation = new Point(0, 0);
 
         public ChooseConnections()
         {
@@ -61,7 +63,21 @@ namespace Sql2SqlCloner
 
         private string GetConnectionString(string connectionString)
         {
-            if (new SQLConnectionDialog(Icon).ShowDialog(ref connectionString) == DialogResult.OK)
+            var success = false;
+            if (ConfigurationManager.AppSettings["ConnectionDialog"]?.ToLower() == "microsoft")
+            {
+                var dcd = new DataConnectionDialog(connectionString);
+                if (dcd.Show() == DialogResult.OK)
+                {
+                    success = true;
+                    connectionString = dcd.ConnectionString;
+                }
+            }
+            else
+            {
+                success = new SQLConnectionDialog(Icon).ShowDialog(ref connectionString) == DialogResult.OK;
+            }
+            if (success)
             {
                 return connectionString;
             }
@@ -79,6 +95,14 @@ namespace Sql2SqlCloner
 
         private void ChooseConnections_Load(object sender, EventArgs e)
         {
+            if (originalLocation.X == 0)
+            {
+                originalLocation.X = Location.X;
+            }
+            if (originalLocation.Y == 0)
+            {
+                originalLocation.Y = Location.Y;
+            }
             Icon = Icon.FromHandle(Properties.Resources.Clone.Handle);
             sourceConnection = Properties.Settings.Default.SourceServer;
             txtSource.Text = GetConnection(sourceConnection);
@@ -138,7 +162,7 @@ namespace Sql2SqlCloner
             var initialTime = DateTime.Now;
             if (!isData.Checked && !isSchema.Checked)
             {
-                MessageBox.Show("Please tick what to copy (schema/data)");
+                MessageBox.Show("Please tick what to copy (schema/data)", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             if (string.IsNullOrEmpty(txtSource.Text))
@@ -155,9 +179,9 @@ namespace Sql2SqlCloner
             }
 
             string DACConnectionString = null;
-            if (Properties.Settings.Default.DecryptObjects)
+            if (decryptObjects.Checked && isSchema.Visible)
             {
-                var builder = new DbConnectionStringBuilder
+                var builder = new SqlConnectionStringBuilder //ojo he cambiado esto y no he probado
                 {
                     ConnectionString = sourceConnection
                 };
@@ -170,7 +194,7 @@ namespace Sql2SqlCloner
                 {
                     throw new Exception("DAC Host not found");
                 }
-                string DACHOST = objField.ToString();
+                var DACHOST = objField.ToString();
 
                 var DACUSER = "sa";
                 var DACPASSWORD = "";
@@ -192,7 +216,7 @@ namespace Sql2SqlCloner
                 //if using DAC connection, preload should not be considered
                 AbortBackgroundTask();
                 strtskSource = null;
-                DACConnectionString = $"Packet Size=4096;User Id={DACUSER};Password={DACPASSWORD};Data Source=ADMIN:{DACHOST};Initial Catalog={DACDATABASE};Persist Security Info=True;{TrustServerCertificateDesc}= true";
+                DACConnectionString = $"Packet Size=4096;User Id={DACUSER};Password={DACPASSWORD};Data Source=ADMIN:{DACHOST};Initial Catalog={DACDATABASE};{TrustServerCertificateDesc}= true";
             }
             Properties.Settings.Default.SourceServer = sourceConnection;
             Properties.Settings.Default.DestinationServer = destinationConnection;
@@ -201,7 +225,6 @@ namespace Sql2SqlCloner
             Properties.Settings.Default.DecryptObjects = decryptObjects.Checked;
             Properties.Settings.Default.Save();
 
-            bool firstStepOk;
             var successConnecting = true;
             SqlSchemaTransfer schemaTransfer = null;
             IList<SqlSchemaTable> tablesToCopy = null;
@@ -219,6 +242,7 @@ namespace Sql2SqlCloner
                     AbortBackgroundTask();
                     cancelToken = new CancellationToken();
                     schemaTransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, DACConnectionString, cancelToken);
+                    lblPleaseWait.Visible = false;
                 }
                 strtskSource = strtskDestination = null;
                 tskPreload = null;
@@ -236,6 +260,7 @@ namespace Sql2SqlCloner
             }
             catch (Exception exc)
             {
+                lblPleaseWait.Visible = false;
                 tskPreload = null;
                 successConnecting = false;
                 var errorMsg = exc.Message;
@@ -257,10 +282,11 @@ namespace Sql2SqlCloner
                 tskPreload = null;
                 return;
             }
+            var firstStepOk = false;
             if (schemaTransfer.SourceObjects?.Count > 0)
             {
-                firstStepOk = false;
                 var chooseSchema = new ChooseSchemas(schemaTransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked, autoRun);
+                chooseSchema.Location = new Point(originalLocation.X - ((chooseSchema.Width - Width) / 2), originalLocation.Y - ((chooseSchema.Height - Height) / 2));
                 var resultdiag = chooseSchema.ShowDialog();
                 if (resultdiag == DialogResult.Abort || resultdiag == DialogResult.Cancel)
                 {
@@ -322,10 +348,8 @@ namespace Sql2SqlCloner
                 }
                 var copyTableData = new CopyTabledata(tablesToCopy, datatransfer, schemaTransfer, firstStepOk || autoRun,
                     Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation,
-                    isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null)
-                {
-                    Visible = false
-                };
+                    isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null);
+                copyTableData.Location = new Point(originalLocation.X - ((copyTableData.Width - Width) / 2), originalLocation.Y - ((copyTableData.Height - Height) / 2));
                 copyTableData.ShowDialog();
                 if (copyTableData.DialogResult == DialogResult.Retry)
                 {
@@ -361,6 +385,11 @@ namespace Sql2SqlCloner
             {
                 destinationConnection = txtDestination.Text;
             }
+        }
+
+        private void isSchema_CheckedChanged(object sender, EventArgs e)
+        {
+            decryptObjects.Visible = isSchema.Checked;
         }
 
         private void ChooseConnections_FormClosing(object sender, FormClosingEventArgs e)

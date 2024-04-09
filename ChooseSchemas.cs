@@ -27,6 +27,7 @@ namespace Sql2SqlCloner
         private Dictionary<string, string> WHERECONDITIONS;
         private Dictionary<string, long> TOPROWS;
         private Dictionary<string, string> ORDERBYFIELDS;
+        private Point originalLocation = new Point();
 
         public ChooseSchemas(SqlSchemaTransfer transferSchema, bool closeIfSuccess, bool selectOnlyTables, bool copyOnlySchema, bool autoRun)
         {
@@ -164,7 +165,7 @@ namespace Sql2SqlCloner
 
         private void LoadTreeNodes(bool sortByRecords)
         {
-            TreeNode[] nodesCopy = new TreeNode[treeView1.Nodes.Count];
+            var nodesCopy = new TreeNode[treeView1.Nodes.Count];
             treeView1.Nodes.CopyTo(nodesCopy, 0);
             treeView1.Nodes.Clear();
             var root = treeView1.Nodes.Add("All");
@@ -505,9 +506,18 @@ namespace Sql2SqlCloner
                 Properties.Settings.Default.DisableNotForReplication = disableNotForReplication.Checked;
                 Properties.Settings.Default.IgnoreFileGroup = ignoreFileGroup.Checked;
                 Properties.Settings.Default.Save();
-
-                DialogResult = new CopySchema(transfer, SelectedObjects.ToList(), CloseIfSuccess,
-                    treeView1.Nodes[0].Checked, disableNotForReplication.Checked).ShowDialog();
+                if (originalLocation.X == 0)
+                {
+                    originalLocation.X = Left;
+                }
+                if (originalLocation.Y == 0)
+                {
+                    originalLocation.Y = Top;
+                }
+                var copyschema = new CopySchema(transfer, SelectedObjects.ToList(), CloseIfSuccess,
+                    treeView1.Nodes[0].Checked, disableNotForReplication.Checked);
+                copyschema.Location = new Point(originalLocation.X + ((copyschema.Width - Width) / 2), originalLocation.Y + ((copyschema.Height - Height) / 2));
+                DialogResult = copyschema.ShowDialog();
                 if (DialogResult == DialogResult.Abort)
                 {
                     Environment.Exit(0);
@@ -602,6 +612,12 @@ namespace Sql2SqlCloner
         {
             DialogResult = DialogResult.Retry;
             Close();
+        }
+
+        private void ChooseSchemas_Shown(object sender, EventArgs e)
+        {
+            originalLocation.X = Location.X;
+            originalLocation.Y = Location.Y;
         }
     }
 }

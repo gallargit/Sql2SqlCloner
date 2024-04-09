@@ -32,6 +32,7 @@ namespace Sql2SqlCloner
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
         private readonly object objLock = new object();
+        private const string RecordsCopied = " records copied";
 
         public CopyTabledata(IList<SqlSchemaTable> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
             bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
@@ -42,7 +43,6 @@ namespace Sql2SqlCloner
             var CopyRows = new ConcurrentBag<DataGridViewRow>();
             //show form while initializing
             InitializeComponent();
-            Visible = true;
             Cursor = Cursors.WaitCursor;
             dataGridView1.Rows.Add(Properties.Resources.waiting, "Calculating", "", null, "", 0);
             (dataGridView1.Rows[0].Cells[0].Value as Bitmap).Tag = Constants.WAITING;
@@ -130,7 +130,19 @@ namespace Sql2SqlCloner
                         var fields = " *";
                         if (convertCollation)
                         {
-                            var sourceTable = tabDictionarySource[item.Name];
+                            Table sourceTable;
+                            if (tabDictionarySource.ContainsKey(item.Name))
+                            {
+                                sourceTable = tabDictionarySource[item.Name];
+                            }
+                            else if (tabDictionarySource.ContainsKey(item.NameWithBrackets))
+                            {
+                                sourceTable = tabDictionarySource[item.NameWithBrackets];
+                            }
+                            else
+                            {
+                                sourceTable = tabDictionarySource[item.NameWithoutBrackets];
+                            }
                             var selectList = new StringBuilder();
                             if (!tabDictionaryDestination.ContainsKey(item.Name))
                             {
@@ -169,7 +181,7 @@ namespace Sql2SqlCloner
                         if (CURRENTTHREAD == 0)
                         {
                             //Prevent "ContextSwitchDeadlock Was Detected" exceptions
-                            if ((DateTime.Now - lastRefresh).TotalSeconds > 1)
+                            if ((DateTime.Now - lastRefresh).TotalMilliseconds > 1500)
                             {
                                 var calculating = dataGridView1.Rows[0].Cells[1].Value.ToString();
                                 calculating += ".";
@@ -188,9 +200,9 @@ namespace Sql2SqlCloner
             }
 
             tasks.ForEach(tt => tt.Wait());
-
             tskDeleteRecords?.Wait();
-
+            dataGridView1.Columns.Cast<DataGridViewColumn>().ToList().ForEach(f => f.SortMode =
+                dataGridView1.Rows.Count <= 1 ? DataGridViewColumnSortMode.NotSortable : DataGridViewColumnSortMode.Automatic);
             dataGridView1.Rows.Clear();
             dataGridView1.Rows.AddRange(CopyRows.OrderBy(a => a.Cells[1].Value.ToString()).ToArray());
             btnCancel.Enabled = btnCopyMessages.Enabled = btnNext.Enabled = btnPause.Enabled = true;
@@ -266,7 +278,7 @@ namespace Sql2SqlCloner
                     }
                     item.Cells["Status"].Value = Properties.Resources.success;
                     ((Bitmap)item.Cells["Status"].Value).Tag = Constants.OK;
-                    item.Cells["Result"].Value = $"{item.Cells["TOP"].Value} records copied";
+                    item.Cells["Result"].Value = $"{item.Cells["TOP"].Value}" + RecordsCopied;
                 }
                 catch (Exception exc)
                 {
@@ -347,6 +359,10 @@ namespace Sql2SqlCloner
                     (string.IsNullOrEmpty(lastError) ? "" : $". Last error was: {lastError}");
                 btnCancel.Text = "Close";
                 dataGridView1.Refresh();
+                dataGridView1.Columns.Cast<DataGridViewColumn>().ToList().ForEach(f => f.SortMode = DataGridViewColumnSortMode.Automatic);
+                var captionResult = "Success";
+                var messageBoxIconResult = MessageBoxIcon.Information;
+                var msgResult = "Data transferred successfully";
                 if (errorCount == 0)
                 {
                     label2.Text = $"100%{ElapsedTime()}";
@@ -358,7 +374,6 @@ namespace Sql2SqlCloner
                     Application.DoEvents();
                     btnCancel.Enabled = false;
                     DateTime endTime;
-                    string msgResult;
                     try
                     {
                         DataTransfer.EnableAllDestinationConstraints();
@@ -367,22 +382,22 @@ namespace Sql2SqlCloner
                             DataTransfer.DisableDisabledObjects();
                         }
                         endTime = DateTime.Now;
-                        msgResult = "Success";
                         label1.Text = savelabeltext;
                     }
                     catch (Exception ex)
                     {
+                        captionResult = "Completed with errors";
+                        messageBoxIconResult = MessageBoxIcon.Warning;
+                        msgResult = ex.Message;
                         label1.Text = $"Completed with errors, constraints not enabled: {ex.Message}";
                         btnCopyMessages.Visible = true;
                         endTime = DateTime.Now;
-                        msgResult = ex.Message;
                     }
                     if (initialTime.HasValue)
                     {
                         var timeDiff = endTime - initialTime.Value;
                         label2.Text += $", Total running time {(timeDiff.Days == 0 ? "" : timeDiff.Days + " days ") + timeDiff.ToString("hh\\:mm\\:ss")}";
                     }
-                    MessageBox.Show(msgResult);
                     btnCopyMessages.Visible = btnCopyMessages.Enabled = true;
                     btnCancel.Enabled = true;
                 }
@@ -392,8 +407,12 @@ namespace Sql2SqlCloner
                     autoScrollGrid.CheckState = CheckState.Unchecked;
                     autoScrollGrid.Text = "Show errors only";
                     autoScrollGrid.Left -= 30;
-                    MessageBox.Show(label1.Text);
+                    captionResult = "Completed with errors";
+                    messageBoxIconResult = MessageBoxIcon.Warning;
+                    msgResult = label1.Text;
                 }
+                MessageBox.Show(msgResult, captionResult, MessageBoxButtons.OK, messageBoxIconResult);
+
                 btnPause.Text = "Start over";
                 btnPause.Enabled = true;
                 Cursor = Cursors.Default;
@@ -551,12 +570,42 @@ namespace Sql2SqlCloner
             if (!waiting && e.RowIndex > -1)
             {
                 var objError = "";
-                if (dataGridView1.Rows[e.RowIndex].Cells[3].Value?.ToString().Contains("records copied") == false)
+                if (dataGridView1.Rows[e.RowIndex].Cells[3].Value?.ToString().Contains(RecordsCopied) == false)
                 {
                     objError = dataGridView1.Rows[e.RowIndex].Cells[3].Value + Environment.NewLine + Environment.NewLine;
                 }
                 NotepadHelper.ShowMessage(objError + dataGridView1.Rows[e.RowIndex].Cells[2].Value,
                     dataGridView1.Rows[e.RowIndex].Cells[1].Value.ToString().Replace("[", "").Replace("]", ""));
+            }
+        }
+
+        private void dataGridView1_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
+        {
+            if (e.CellValue1 != null && e.CellValue2 != null)
+            {
+                if (e.CellValue1 is Bitmap)
+                {
+                    e.SortResult = (e.CellValue1 as Bitmap).Tag.ToString().CompareTo((e.CellValue2 as Bitmap).Tag.ToString());
+                    e.Handled = true;
+                }
+                else
+                {
+                    var cell1 = e.CellValue1.ToString();
+                    var cell2 = e.CellValue2.ToString();
+                    if (cell1.EndsWith(RecordsCopied) && cell2.EndsWith(RecordsCopied))
+                    {
+                        if (int.TryParse(cell1.Replace(RecordsCopied, ""), out int records1))
+                        {
+                            if (int.TryParse(cell2.Replace(RecordsCopied, ""), out int records2))
+                            {
+                                e.SortResult = records1 - records2;
+                                e.Handled = true;
+                                return;
+                            }
+                        }
+                    }
+                    e.SortResult = e.CellValue1.ToString().CompareTo(e.CellValue2.ToString());
+                }
             }
         }
     }

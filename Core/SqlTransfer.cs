@@ -4,7 +4,6 @@ using Microsoft.SqlServer.Management.Smo;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Data;
 using System.Linq;
 
 namespace Sql2SqlCloner.Core
@@ -47,7 +46,7 @@ namespace Sql2SqlCloner.Core
             {
                 try
                 {
-                    if (sourceConnection.SqlConnectionObject.State != ConnectionState.Open)
+                    if (sourceConnection.SqlConnectionObject.State != System.Data.ConnectionState.Open)
                     {
                         sourceConnection.SqlConnectionObject.Open();
                     }
@@ -66,7 +65,7 @@ namespace Sql2SqlCloner.Core
             {
                 try
                 {
-                    if (destinationConnection.SqlConnectionObject.State != ConnectionState.Open)
+                    if (destinationConnection.SqlConnectionObject.State != System.Data.ConnectionState.Open)
                     {
                         destinationConnection.SqlConnectionObject.Open();
                     }
@@ -223,7 +222,7 @@ namespace Sql2SqlCloner.Core
             var sqlCommand = new SqlCommand()
             {
                 Connection = sqlConnectionObject,
-                CommandType = CommandType.Text,
+                CommandType = System.Data.CommandType.Text,
                 CommandTimeout = timeout ?? sqlTimeout
             };
             if (!string.IsNullOrEmpty(sql))

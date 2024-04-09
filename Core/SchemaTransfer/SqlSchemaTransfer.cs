@@ -103,22 +103,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
         private void InitServer(Server serv)
         {
-            // set the default properties we want upon partial instantiation -
-            // smo is *really* slow if you don't do this
-            serv.SetDefaultInitFields(typeof(Schema), "IsSystemObject", "Name");
-            serv.SetDefaultInitFields(typeof(Table), "Schema", "IsSystemObject", "Name");
-            serv.SetDefaultInitFields(typeof(StoredProcedure), "IsSystemObject", "Name", "Owner");
-            serv.SetDefaultInitFields(typeof(UserDefinedFunction), "IsSystemObject", "Name", "Owner");
-            serv.SetDefaultInitFields(typeof(View), "Schema", "IsSystemObject", "Name");
-            serv.SetDefaultInitFields(typeof(Column), "Identity", "Name");
-            serv.SetDefaultInitFields(typeof(Index), "IndexKeyType", "Name");
-            serv.SetDefaultInitFields(typeof(Trigger), "IsSystemObject", "Name");
-            serv.SetDefaultInitFields(typeof(User), "IsSystemObject", "Name");
-            serv.SetDefaultInitFields(typeof(DatabaseRole), "Name");
-            serv.SetDefaultInitFields(typeof(UserDefinedDataType), "Name");
-            serv.SetDefaultInitFields(typeof(UserDefinedTableType), "Schema", "Name");
-            serv.SetDefaultInitFields(typeof(XmlSchemaCollection), "Name");
-            serv.SetDefaultInitFields(typeof(Default), "Schema", "Name");
+            serv.SetDefaultInitFields(true);
         }
 
         private void ResetTransfer()
@@ -306,7 +291,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             return result;
         }
 
-        public void CreateObject(NamedSmoObject obj, bool dropIfExists, bool overrideCollation, bool useSourceCollation,
+        public void TransferObject(NamedSmoObject obj, bool dropIfExists, bool overrideCollation, bool useSourceCollation,
             bool alterInsteadOfCreate, bool? removeSchemaBinding)
         {
             using (var command = GetDestinationSqlCommand(sqlTimeout))
@@ -457,7 +442,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     if (!string.IsNullOrEmpty(schemaname) && !existingschemas.Contains(schemaname))
                     {
                         command.CommandText =
-                            $"IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name=N'{schemaname}') EXEC('CREATE SCHEMA [{schemaname}]{GetSchemaAuthorization(obj.Name)}')";
+                            $"IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name=N'{schemaname}') EXEC('CREATE SCHEMA [{schemaname}]{GetSchemaAuthorization(obj.Name)}')";
                         command.ExecuteNonQuery();
                         existingschemas.Add(schemaname);
                     }
@@ -1219,14 +1204,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
 
-            foreach (IExtendedProperties item in lst.OfType<IExtendedProperties>()
-                         .Where(p => p.ExtendedProperties?.Count > 0))
+            foreach (var item in lst.OfType<IExtendedProperties>().Where(p => p.ExtendedProperties?.Count > 0))
             {
                 foreach (ExtendedProperty property in item.ExtendedProperties)
                 {
                     try
                     {
-                        CreateObject(property, true, false, false, false, null);
+                        TransferObject(property, true, false, false, false, null);
                     }
                     catch
                     {
@@ -1234,7 +1218,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     }
                 }
             }
-
             //Clustered indexes properties cannot be obtained via SMO, do a direct copy instead
             AddClusteredIndexesDescriptions(true, true);
         }
@@ -1262,7 +1245,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     if (DestinationObjects.Any(d => d.Type == obj.Type && d.Name == obj.Name))
                     {
-                        CreateObject(obj.Object, false, false, false, true, true);
+                        TransferObject(obj.Object, false, false, false, true, true);
                     }
                 }
                 catch //"not found"
@@ -1286,7 +1269,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     try
                     {
-                        CreateObject(item.Object, false, false, false, true, false);
+                        TransferObject(item.Object, false, false, false, true, false);
                         processList.Remove(item);
                     }
                     catch
@@ -1311,7 +1294,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     INNER JOIN sys.tables t ON t.object_id=i.object_id
                     WHERE p.class=7 AND (i.type=1 OR is_primary_key=1)");
             }
-
             if (views)
             {
                 CopyToDestination(

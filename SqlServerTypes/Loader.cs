@@ -23,9 +23,9 @@ namespace SqlServerTypes
         /// </param>
         public static void LoadNativeAssemblies(string rootApplicationPath)
         {
+            const string spatialDll = "SqlServerSpatial160.dll";
             var architecture = IntPtr.Size > 4 ? "x64" : "x86";
             var SNIDll = $"Microsoft.Data.SqlClient.SNI.{architecture}.dll";
-            const string spatialDll = "SqlServerSpatial160.dll";
 
             var spatialAssemblyPath = Path.Combine(rootApplicationPath, architecture);
             var spatialAssemblyName = Path.Combine(spatialAssemblyPath, spatialDll);
@@ -81,7 +81,6 @@ namespace SqlServerTypes
                     }
                 }
             }
-
             LoadNativeAssembly(spatialAssemblyName);
         }
 

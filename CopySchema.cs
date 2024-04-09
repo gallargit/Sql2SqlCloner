@@ -35,6 +35,7 @@ namespace Sql2SqlCloner
         private readonly object inProgress = new object();
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
+        private DateTime lastUpdate = DateTime.Now;
 
         public CopySchema(SqlSchemaTransfer transferSchema, IList<SqlSchemaObject> lstObjects,
             bool closeIfSuccess, bool autoStart, bool disableNotForReplication)
@@ -107,12 +108,17 @@ namespace Sql2SqlCloner
             if (IsHandleCreated)
             {
                 var item = dataGridView1.Rows[0].DataBoundItem as SqlSchemaObject;
-                item.Name += ".";
-                if (item.Name.EndsWith("...."))
+                if ((DateTime.Now - lastUpdate).TotalMilliseconds > 1000)
                 {
-                    item.Name = item.Name.Replace("....", "");
+                    item.Name += ".";
+                    if (item.Name.EndsWith("...."))
+                    {
+                        item.Name = item.Name.Replace("....", "");
+                    }
+                    lastUpdate = DateTime.Now;
                 }
-                item.Type = currObject.GetType().Name;
+
+                item.Type = currObject == null ? "" : currObject.GetType().Name;
                 item.Object = currObject;
                 dataGridView1.Invoke(new Action(() => dataGridView1.Refresh()));
             }
@@ -135,7 +141,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     currentBackground++;
-                    stransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
+                    stransfer.TransferObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
                         overrideCollation, useSourceCollation, false, null);
                     item.Status = Properties.Resources.success;
                     item.Status.Tag = Constants.OK;
@@ -333,8 +339,8 @@ namespace Sql2SqlCloner
                         }
                         try
                         {
-                            SchemaTransfer.CreateObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
-                                overrideCollation, useSourceCollation, false, null);
+                            SchemaTransfer.TransferObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
+                                                         overrideCollation, useSourceCollation, false, null);
                             item.Status = Properties.Resources.success;
                             item.Status.Tag = Constants.OK;
                             item.Error = "";
@@ -439,14 +445,17 @@ namespace Sql2SqlCloner
                         return;
                     }
                     SchemaTransfer.RefreshDestination();
-                    currentlyCopying = "Processing indexes";
 
-                    //tables should go first
+                    //indexes: tables should go first
+                    var totalItemsCount = CopyList.Count(i => i.Type == "Table" || i.Type == "View");
+                    var currentItem = 0;
                     foreach (var item in CopyList.Where(i => i.Type == "Table" || i.Type == "View").OrderBy(ix => ix.Type).ToList())
                     {
+                        currentItem++;
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
+                            currentlyCopying = $"Processing index {item.Name}  {currentItem}/{totalItemsCount}";
                             SchemaTransfer.ApplyIndexes(item.Object, Properties.Settings.Default.CopyFullText && Properties.Settings.Default.CopyConstraints);
                         }
                         catch (Exception ex)
@@ -459,13 +468,18 @@ namespace Sql2SqlCloner
                     {
                         return;
                     }
-                    currentlyCopying = "Processing foreign keys";
+
+                    //foreign keys
                     var savecurrent = current;
+                    totalItemsCount = CopyList.Count(i => i.Type == "Table");
+                    currentItem = 0;
                     foreach (var item in CopyList.Where(i => i.Type == "Table").ToList())
                     {
+                        currentItem++;
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
+                            currentlyCopying = $"Processing foreign key {item.Name}  {currentItem}/{totalItemsCount}";
                             SchemaTransfer.ApplyForeignKeys(item.Object, disableNotForReplication);
                         }
                         catch (Exception ex)
@@ -481,13 +495,16 @@ namespace Sql2SqlCloner
                         return;
                     }
 
+                    //checks
                     savecurrent = current;
-                    currentlyCopying = "Processing checks";
+                    currentItem = 0;
                     foreach (var item in CopyList.Where(i => i.Type == "Table"))
                     {
+                        currentItem++;
                         try
                         {
                             pause.WaitOne(Timeout.Infinite);
+                            currentlyCopying = $"Processing check {item.Name}  {currentItem}/{totalItemsCount}";
                             SchemaTransfer.ApplyChecks(item.Object, disableNotForReplication);
                             backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
                         }
@@ -529,7 +546,6 @@ namespace Sql2SqlCloner
                     {
                         MessageBox.Show($"Error copying extended properties: {ex.Message}");
                     }
-
                     lastError = ex.Message;
                     errorCount++;
                 }
@@ -679,7 +695,8 @@ namespace Sql2SqlCloner
                         btnPause.Text = "Start over";
                         btnPause.Enabled = true;
                     }
-                    MessageBox.Show($"Finished. {label1.Text}");
+                    MessageBox.Show($"{label1.Text}", "Finished", MessageBoxButtons.OK,
+                        errorCount == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
                 }
             }
         }
