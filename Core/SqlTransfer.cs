@@ -53,7 +53,7 @@ namespace Sql2SqlCloner.Core
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception("Error connecting to source server: " + sourceConnection.ServerInstance, ex);
+                    throw new Exception($"Error connecting to source server: {sourceConnection.ServerInstance}", ex);
                 }
                 return sourceConnection;
             }
@@ -72,7 +72,7 @@ namespace Sql2SqlCloner.Core
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception("Error connecting to destination server: " + destinationConnection.ServerInstance, ex);
+                    throw new Exception($"Error connecting to destination server: {destinationConnection.ServerInstance}", ex);
                 }
                 return destinationConnection;
             }
@@ -273,7 +273,7 @@ namespace Sql2SqlCloner.Core
             }
             else
             {
-                throw new Exception("Wrong connection " + cx.SqlConnectionObject);
+                throw new Exception($"Wrong connection: {cx.SqlConnectionObject}");
             }
         }
     }

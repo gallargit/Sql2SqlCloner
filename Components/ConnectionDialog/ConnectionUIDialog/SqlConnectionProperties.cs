@@ -43,7 +43,7 @@ namespace Microsoft.Data.ConnectionUI
             }
         }
 
-        public override void Test()
+        public override string Test()
         {
             string dataSource = ConnectionStringBuilder.DataSource;
             if (string.IsNullOrEmpty(dataSource))
@@ -53,7 +53,7 @@ namespace Microsoft.Data.ConnectionUI
             string database = ConnectionStringBuilder.InitialCatalog;
             try
             {
-                base.Test();
+                return base.Test();
             }
             catch (SqlException e) when (e.Number == SqlError_CannotOpenDatabase && database?.Length > 0)
             {
@@ -149,7 +149,7 @@ namespace Microsoft.Data.ConnectionUI
             }
         }
 
-        public override void Test()
+        public override string Test()
         {
             string attachDbFilename = ConnectionStringBuilder.AttachDBFilename;
             try
@@ -163,7 +163,7 @@ namespace Microsoft.Data.ConnectionUI
                 {
                     throw new InvalidOperationException("This connection cannot be tested because the specified database file does not exist.");
                 }
-                base.Test();
+                return base.Test();
             }
             catch (SqlException e)
             {

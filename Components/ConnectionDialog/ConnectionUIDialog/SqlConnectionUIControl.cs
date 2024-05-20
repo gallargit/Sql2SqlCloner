@@ -714,8 +714,13 @@ namespace Microsoft.Data.ConnectionUI
             return str.ToString();
         }
 
-        public void TestButtonSuccess()
+        public void TestButtonSuccess(string username)
         {
+            if (!string.IsNullOrEmpty(username) && userNameTextBox.Enabled)
+            {
+                userNameTextBox.Text = username;
+            }
+
             SetDatabase(null, null);
         }
 

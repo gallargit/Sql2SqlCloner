@@ -2,6 +2,6 @@
 {
     internal interface ISuccess
     {
-        void TestButtonSuccess();
+        void TestButtonSuccess(string username);
     }
 }

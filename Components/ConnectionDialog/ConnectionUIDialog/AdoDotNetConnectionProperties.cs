@@ -153,7 +153,7 @@ namespace Microsoft.Data.ConnectionUI
             }
         }
 
-        public virtual void Test()
+        public virtual string Test()
         {
             string testString = ToTestString();
             // If the connection string is empty, don't even bother testing
@@ -171,6 +171,18 @@ namespace Microsoft.Data.ConnectionUI
                 connection.ConnectionString = testString;
                 connection.Open();
                 Inspect(connection);
+                //try to return current username
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "SELECT SUSER_SNAME()";
+                    var reader = command.ExecuteReader();
+                    var dataTable = new System.Data.DataTable
+                    {
+                        Locale = System.Globalization.CultureInfo.CurrentCulture
+                    };
+                    dataTable.Load(reader);
+                    return dataTable.Rows[0][0].ToString();
+                }
             }
             finally
             {

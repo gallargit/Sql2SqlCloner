@@ -19,7 +19,7 @@ namespace Microsoft.Data.ConnectionUI
         void Remove(string propertyName);
         void Reset();
         void Reset(string propertyName);
-        void Test();
+        string Test();
         object this[string propertyName] { get; set; }
         string ToDisplayString();
         string ToFullString();

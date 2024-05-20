@@ -1080,13 +1080,14 @@ namespace Microsoft.Data.ConnectionUI
         {
             Cursor currentCursor = Cursor.Current;
             Cursor.Current = Cursors.WaitCursor;
+            string username = null;
             try
             {
-                ConnectionProperties.Test();
+                username = ConnectionProperties.Test();
                 if (ConnectionUIControl is ISuccess)
                 {
                     // fill database combobox here
-                    (ConnectionUIControl as ISuccess).TestButtonSuccess();
+                    (ConnectionUIControl as ISuccess).TestButtonSuccess(username);
                 }
             }
             catch (Exception ex)
@@ -1096,7 +1097,7 @@ namespace Microsoft.Data.ConnectionUI
                 return;
             }
             Cursor.Current = currentCursor;
-            ShowMessage("Test results.", "Test connection succeeded.");
+            ShowMessage(string.IsNullOrEmpty(username) ? "Test results" : $"Connected as: {username}", "Test connection succeeded.");
         }
 
         private void ConfigureAcceptButton(object sender, EventArgs e)
@@ -1302,10 +1303,6 @@ namespace Microsoft.Data.ConnectionUI
 
         private class BasicConnectionProperties : IDataConnectionProperties
         {
-            public BasicConnectionProperties()
-            {
-            }
-
             public void Reset()
             {
                 _s = string.Empty;
@@ -1392,8 +1389,9 @@ namespace Microsoft.Data.ConnectionUI
                 }
             }
 
-            public void Test()
+            public string Test()
             {
+                return string.Empty;
             }
 
             public string ToFullString()
