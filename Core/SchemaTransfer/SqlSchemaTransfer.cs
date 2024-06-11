@@ -418,7 +418,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                     if (!string.IsNullOrEmpty(incompatibleErrorMsg))
                     {
-                        incompatibleErrorMsg = "Incompatible subitems in this object:" + incompatibleErrorMsg;
+                        incompatibleErrorMsg = $"Incompatible subitems in this object: {incompatibleErrorMsg}";
                     }
 
                     transfer.IncompatibleObjects.Clear();
@@ -2205,6 +2205,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
 
                 //refresh local objects before exiting
+                if (DestinationObjects.Count == 0)
+                {
+                    Monitor.Enter(lockFlag);
+                    mainContext.DoCallBack(() => callback?.Invoke(null));
+                    Monitor.Exit(lockFlag);
+                    Thread.Yield();
+                }
                 RefreshDestinationObjects();
                 remaining = DestinationObjects.Count;
             }

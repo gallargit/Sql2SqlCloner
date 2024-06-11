@@ -116,7 +116,10 @@ namespace Sql2SqlCloner.Core
             {
                 while (reader.Read())
                 {
-                    lstToRun.Add((string)reader[0]);
+                    if (reader[0] != DBNull.Value)
+                    {
+                        lstToRun.Add((string)reader[0]);
+                    }
                 }
             }
             if (lstToRun.Count > 0)

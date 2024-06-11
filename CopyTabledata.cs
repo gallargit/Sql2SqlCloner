@@ -174,7 +174,7 @@ namespace Sql2SqlCloner
                             }
                         }
 
-                        var sql = $"SELECT{stritemTopRecords}{fields} FROM {item.Name} WITH(NOLOCK) {item.WhereFilter} {item.OrderByFields}";
+                        var sql = $"SELECT{stritemTopRecords}{fields} FROM {item.NameWithBrackets} WITH(NOLOCK) {item.WhereFilter} {item.OrderByFields}";
                         var row = (DataGridViewRow)dataGridView1.Rows[0].Clone();
                         row.SetValues(Properties.Resources.empty, item.Name, sql.Trim(), null, item.HasRelationships.ToString().ToLowerInvariant(), itemTopRecords);
                         CopyRows.Add(row);
@@ -592,17 +592,13 @@ namespace Sql2SqlCloner
                 {
                     var cell1 = e.CellValue1.ToString();
                     var cell2 = e.CellValue2.ToString();
-                    if (cell1.EndsWith(RecordsCopied) && cell2.EndsWith(RecordsCopied))
+                    if (cell1.EndsWith(RecordsCopied) && cell2.EndsWith(RecordsCopied) &&
+                        int.TryParse(cell1.Replace(RecordsCopied, ""), out int records1) &&
+                        int.TryParse(cell2.Replace(RecordsCopied, ""), out int records2))
                     {
-                        if (int.TryParse(cell1.Replace(RecordsCopied, ""), out int records1))
-                        {
-                            if (int.TryParse(cell2.Replace(RecordsCopied, ""), out int records2))
-                            {
-                                e.SortResult = records1 - records2;
-                                e.Handled = true;
-                                return;
-                            }
-                        }
+                        e.SortResult = records1 - records2;
+                        e.Handled = true;
+                        return;
                     }
                     e.SortResult = e.CellValue1.ToString().CompareTo(e.CellValue2.ToString());
                 }

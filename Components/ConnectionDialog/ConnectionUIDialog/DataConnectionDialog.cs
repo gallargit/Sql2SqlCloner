@@ -552,7 +552,7 @@ namespace Microsoft.Data.ConnectionUI
                 }
                 if (!(_connectionUIControlTable[SelectedDataSource][SelectedDataProvider] is UserControl result))
                 {
-                    result = (_connectionUIControlTable[SelectedDataSource][SelectedDataProvider] as IContainerControl).ActiveControl as UserControl;
+                    result = (_connectionUIControlTable[SelectedDataSource][SelectedDataProvider] as IContainerControl)?.ActiveControl as UserControl;
                 }
                 return result;
             }
@@ -1080,14 +1080,14 @@ namespace Microsoft.Data.ConnectionUI
         {
             Cursor currentCursor = Cursor.Current;
             Cursor.Current = Cursors.WaitCursor;
-            string username = null;
+            string username;
             try
             {
                 username = ConnectionProperties.Test();
                 if (ConnectionUIControl is ISuccess)
                 {
                     // fill database combobox here
-                    (ConnectionUIControl as ISuccess).TestButtonSuccess(username);
+                    (ConnectionUIControl as ISuccess)?.TestButtonSuccess(username);
                 }
             }
             catch (Exception ex)

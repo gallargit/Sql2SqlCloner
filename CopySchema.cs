@@ -216,6 +216,14 @@ namespace Sql2SqlCloner
                 RefreshDataGrid();
                 btnPauseEnabled = true;
             }
+            //check change tracking
+            SchemaTransfer.RunInDestination($"SELECT CASE WHEN (SELECT COUNT(*) FROM sys.change_tracking_databases WHERE UPPER(DB_NAME(database_id))= UPPER('{SchemaTransfer.DestinationDatabaseName}'))>0 THEN 'ALTER DATABASE [{SchemaTransfer.DestinationDatabaseName}] SET CHANGE_TRACKING = OFF' ELSE NULL END");
+            SchemaTransfer.RunInDestination(
+                $"SELECT CASE WHEN (SELECT COUNT(*) FROM sys.change_tracking_databases WHERE UPPER(DB_NAME(database_id))=UPPER('{SchemaTransfer.SourceDatabaseName}'))=0 THEN NULL " +
+                $"ELSE (SELECT 'ALTER DATABASE [{SchemaTransfer.DestinationDatabaseName}] SET CHANGE_TRACKING = ON '+" +
+                "'(CHANGE_RETENTION = ' + CAST(retention_period AS VARCHAR) + '  ' + retention_period_units_desc + ', AUTO_CLEANUP = ' + CASE WHEN is_auto_cleanup_on='1' THEN 'ON' ELSE 'OFF' END  +')'" +
+                $" FROM sys.change_tracking_databases WHERE UPPER(DB_NAME(database_id))= UPPER('{SchemaTransfer.SourceDatabaseName}')) END");
+
             backgroundWorker1.ReportProgress(0);
             currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
             bool overrideCollation, useSourceCollation;
