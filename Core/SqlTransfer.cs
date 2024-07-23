@@ -26,8 +26,8 @@ namespace Sql2SqlCloner.Core
 
         public SqlTransfer(string src, string dest, IList<string> lstPostExecutionExecute)
         {
-            SourceConnectionString = src;
-            DestinationConnectionString = dest;
+            SourceConnectionString = src + ";Persist Security Info=True";
+            DestinationConnectionString = dest + ";Persist Security Info=True";
             sourceConnection = new ServerConnection(new SqlConnection(src));
             destinationConnection = new ServerConnection(new SqlConnection(dest));
             dbSource = new Server(SourceConnection).Databases[SourceDatabaseName];

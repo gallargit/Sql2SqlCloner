@@ -31,6 +31,7 @@ namespace Microsoft.Data.ConnectionUI
         private string currentOleDBProvider;
         private bool currentUserInstanceSetting;
         private ControlProperties _controlProperties;
+        private readonly object loadingItem = "(loading...)";
 
         public SqlConnectionUIControl(string initialConnectionString)
         {
@@ -447,7 +448,8 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (selectDatabaseComboBox.Items.Count == 0)
             {
-                Cursor currentCursor = Cursor.Current;
+                selectDatabaseComboBox.Items.Add(loadingItem);
+                var currentCursor = Cursor.Current;
                 Cursor.Current = Cursors.WaitCursor;
                 try
                 {
@@ -639,6 +641,17 @@ namespace Microsoft.Data.ConnectionUI
                 }
                 catch
                 {
+                    if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
+                    {
+                        selectDatabaseComboBox.Invoke((Action)delegate
+                        {
+                            try
+                            {
+                                selectDatabaseComboBox.Items.Clear();
+                            }
+                            catch { }
+                        });
+                    }
                     dataTable = new System.Data.DataTable
                     {
                         Locale = System.Globalization.CultureInfo.InvariantCulture
@@ -674,12 +687,17 @@ namespace Microsoft.Data.ConnectionUI
 
         private void PopulateDatabaseComboBox()
         {
-            if (selectDatabaseComboBox.Items.Count == 0)
+            if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
             {
-                if (_databases.Count > 0)
+                try
                 {
-                    selectDatabaseComboBox.Items.AddRange(_databases.ToArray());
+                    selectDatabaseComboBox.Items.Clear();
                 }
+                catch { }
+            }
+            if (selectDatabaseComboBox.Items.Count == 0 && _databases.Count > 0)
+            {
+                selectDatabaseComboBox.Items.AddRange(_databases.ToArray());
             }
             _databaseEnumerationTask = null;
         }

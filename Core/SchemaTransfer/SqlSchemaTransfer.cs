@@ -1080,29 +1080,29 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 if (o is Table currentTable)
                 {
                     lst.Remove(o);
-                    foreach (Index sub in currentTable.Indexes)
+                    foreach (Index s in currentTable.Indexes)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
-                    foreach (ForeignKey sub in currentTable.ForeignKeys)
+                    foreach (ForeignKey s in currentTable.ForeignKeys)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
-                    foreach (Check sub in currentTable.Checks)
+                    foreach (Check s in currentTable.Checks)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
                 }
                 else if (o is View currentView)
                 {
                     lst.Remove(o);
-                    foreach (Column sub in currentView.Columns)
+                    foreach (Column s in currentView.Columns)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
-                    foreach (Index sub in currentView.Indexes)
+                    foreach (Index s in currentView.Indexes)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
                 }
                 else if (o is StoredProcedure currentProcedure)
@@ -1112,13 +1112,13 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 else if (o is UserDefinedFunction currentFunction)
                 {
                     lst.Remove(o);
-                    foreach (Column sub in currentFunction.Columns)
+                    foreach (Column s in currentFunction.Columns)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
-                    foreach (Check sub in currentFunction.Checks)
+                    foreach (Check s in currentFunction.Checks)
                     {
-                        lst.Add(sub);
+                        lst.Add(s);
                     }
                 }
             }
@@ -1132,75 +1132,34 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 if (obj is Table currentTable)
                 {
-                    foreach (Column sub in currentTable.Columns)
+                    currentTable.Columns.Cast<Column>().ToList().ForEach(s =>
                     {
-                        lst.Add(sub);
-                        if (sub.DefaultConstraint != null)
+                        lst.Add(s);
+                        if (s.DefaultConstraint != null)
                         {
-                            lst.Add(sub.DefaultConstraint);
+                            lst.Add(s.DefaultConstraint);
                         }
-                    }
-
-                    foreach (Index sub in currentTable.Indexes)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (ForeignKey sub in currentTable.ForeignKeys)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (Trigger sub in currentTable.Triggers)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (Check sub in currentTable.Checks)
-                    {
-                        lst.Add(sub);
-                    }
+                    });
+                    currentTable.Indexes.Cast<Index>().ToList().ForEach(s => lst.Add(s));
+                    currentTable.ForeignKeys.Cast<ForeignKey>().ToList().ForEach(s => lst.Add(s));
+                    currentTable.Triggers.Cast<Trigger>().ToList().ForEach(s => lst.Add(s));
+                    currentTable.Checks.Cast<Check>().ToList().ForEach(s => lst.Add(s));
                 }
                 else if (obj is View currentView)
                 {
-                    foreach (Column sub in currentView.Columns)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (Index sub in currentView.Indexes)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (Trigger sub in currentView.Triggers)
-                    {
-                        lst.Add(sub);
-                    }
+                    currentView.Columns.Cast<Column>().ToList().ForEach(s => lst.Add(s));
+                    currentView.Indexes.Cast<Index>().ToList().ForEach(s => lst.Add(s));
+                    currentView.Triggers.Cast<Trigger>().ToList().ForEach(s => lst.Add(s));
                 }
                 else if (obj is StoredProcedure currentProcedure)
                 {
-                    foreach (Microsoft.SqlServer.Management.Smo.Parameter sub in currentProcedure.Parameters)
-                    {
-                        lst.Add(sub);
-                    }
+                    currentProcedure.Parameters.Cast<Microsoft.SqlServer.Management.Smo.Parameter>().ToList().ForEach(s => lst.Add(s));
                 }
                 else if (obj is UserDefinedFunction currentFunction)
                 {
-                    foreach (Column sub in currentFunction.Columns)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (Check sub in currentFunction.Checks)
-                    {
-                        lst.Add(sub);
-                    }
-
-                    foreach (Microsoft.SqlServer.Management.Smo.Parameter sub in currentFunction.Parameters)
-                    {
-                        lst.Add(sub);
-                    }
+                    currentFunction.Columns.Cast<Column>().ToList().ForEach(s => lst.Add(s));
+                    currentFunction.Checks.Cast<Check>().ToList().ForEach(s => lst.Add(s));
+                    currentFunction.Parameters.Cast<Microsoft.SqlServer.Management.Smo.Parameter>().ToList().ForEach(s => lst.Add(s));
                 }
             }
 
@@ -1408,8 +1367,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
             foreach (Rule item in db.Rules)
             {
-                items.Add(new SqlSchemaObject
-                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1429,8 +1387,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
             foreach (Default item in db.Defaults)
             {
-                items.Add(new SqlSchemaObject
-                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1452,8 +1409,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 foreach (UserDefinedTableType item in db.UserDefinedTableTypes)
                 {
-                    items.Add(new SqlSchemaObject
-                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                    items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
 
@@ -1501,8 +1457,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 foreach (Sequence item in db.Sequences)
                 {
-                    items.Add(new SqlSchemaObject
-                    { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                    items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
                 }
             }
 
@@ -1562,8 +1517,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     items.Add(table);
                     foreach (Trigger trigger in item.Triggers)
                     {
-                        items.Add(new SqlSchemaObject
-                        { Parent = table, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
+                        items.Add(new SqlSchemaObject { Parent = table, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
                     }
                 }
             }
@@ -1584,8 +1538,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 items.Add(view);
                 foreach (Trigger trigger in item.Triggers)
                 {
-                    items.Add(new SqlSchemaObject
-                    { Parent = view, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
+                    items.Add(new SqlSchemaObject { Parent = view, Name = trigger.Name, Object = trigger, Type = trigger.GetType().Name });
                 }
             }
 
@@ -1635,8 +1588,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             foreach (UserDefinedFunction item in db.UserDefinedFunctions.Cast<UserDefinedFunction>().AsQueryable()
                          .Where(f => !f.IsSystemObject || f.Owner != "sys"))
             {
-                items.Add(new SqlSchemaObject
-                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1647,8 +1599,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             foreach (StoredProcedure item in db.StoredProcedures.Cast<StoredProcedure>().AsQueryable()
                          .Where(p => !p.IsSystemObject || p.Owner != "sys"))
             {
-                items.Add(new SqlSchemaObject
-                { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
+                items.Add(new SqlSchemaObject { Name = $"{item.Schema}.{item.Name}", Object = item, Type = item.GetType().Name });
             }
 
             if (CancelToken.IsCancellationRequested)
@@ -1721,7 +1672,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             insertIndex++;
                         }
                     }
-
                     indexesSorted.Insert(insertIndex, srcindex);
                 }
                 else
@@ -1753,8 +1703,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                 //primary keys for system-versioned tables are already created
                 if (destinationTable is Table table && table.GetTableProperty("IsSystemVersioned") &&
-                    !table.GetTableProperty("IsMemoryOptimized")
-                    && (srcindex.IndexKeyType == IndexKeyType.DriPrimaryKey))
+                    !table.GetTableProperty("IsMemoryOptimized") &&
+                    (srcindex.IndexKeyType == IndexKeyType.DriPrimaryKey))
                 {
                     continue;
                 }
@@ -1879,7 +1829,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     index.Level4Grid = srcindex.Level4Grid;
                     index.SpatialIndexType = srcindex.SpatialIndexType;
                 }
-
                 index.Create();
             }
 
@@ -1926,7 +1875,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             TypeColumnName = srccol.TypeColumnName
                         });
                     }
-
                     index.Create();
                 }
             }
@@ -1951,7 +1899,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                     foreignkey.Columns.Add(new ForeignKeyColumn(foreignkey, scol.Name, scol.ReferencedColumn));
                 }
-
                 foreignkey.Create();
             }
         }
@@ -2078,7 +2025,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 var retrylist = new List<NamedSmoObject>();
                 DestinationObjects.Select(o => o.Object).Where(p => !(p is Schema))
                     .Union(DestinationObjects.Select(s => s.Object))
-                    .Where(nt => !(nt is Table) && !(nt is Trigger))
+                    .Where(t => !(t is Table) && !(t is Trigger))
                     .ToList()
                     .ForEach(item => destinations.Add(item, CancelToken));
 
@@ -2130,7 +2077,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     DestinationObjects.Select(o => o.Object).Where(p => p is Schema)
                         .ToList()
                         .ForEach(item => destinations.Add(item, CancelToken));
-
                     destinations.CompleteAdding();
                 }, CancelToken);
 
@@ -2204,14 +2150,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 {
                 }
 
-                //refresh local objects before exiting
-                if (DestinationObjects.Count == 0)
-                {
-                    Monitor.Enter(lockFlag);
-                    mainContext.DoCallBack(() => callback?.Invoke(null));
-                    Monitor.Exit(lockFlag);
-                    Thread.Yield();
-                }
                 RefreshDestinationObjects();
                 remaining = DestinationObjects.Count;
             }
@@ -2232,7 +2170,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             {
                 return "(local)";
             }
-
             return instanceName;
         }
 
