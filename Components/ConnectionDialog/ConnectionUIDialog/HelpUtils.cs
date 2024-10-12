@@ -33,10 +33,9 @@ namespace Microsoft.Data.ConnectionUI
             bool isWow64 = false;
             if (Environment.OSVersion.Version.Major >= 5)
             {
-                System.Diagnostics.Process curProcess = System.Diagnostics.Process.GetCurrentProcess();
                 try
                 {
-                    NativeMethods.IsWow64Process(curProcess.Handle, out isWow64);
+                    NativeMethods.IsWow64Process(Process.GetCurrentProcess().Handle, out isWow64);
                 }
                 catch (Exception e)
                 {

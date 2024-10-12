@@ -103,6 +103,19 @@ namespace Microsoft.Data.ConnectionUI
             _controlProperties = new ControlProperties(connectionProperties);
         }
 
+        private void ResetForm()
+        {
+            connectionerrorLabel.Visible = false;
+            if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
+            {
+                selectDatabaseComboBox.Items.Clear();
+            }
+            if (selectDatabaseComboBox.Text == loadingItem.ToString())
+            {
+                selectDatabaseComboBox.Text = "";
+            }
+        }
+
         public void LoadProperties()
         {
             _loading = true;
@@ -118,11 +131,12 @@ namespace Microsoft.Data.ConnectionUI
             try
             {
                 var cb = new SqlConnectionStringBuilder(InitialConnectionString);
-                if (cb.IntegratedSecurity)
+                if (string.IsNullOrEmpty(InitialConnectionString))
                 {
-                    Properties.UseWindowsAuthentication = true;
+                    cb.TrustServerCertificate = Properties.TrustServerCertificate;
                 }
-                else
+
+                if (!cb.IntegratedSecurity)
                 {
                     Properties.UseWindowsAuthentication = false;
                     Properties.SelectedAuthenticationMethod = cb.Authentication;
@@ -130,6 +144,10 @@ namespace Microsoft.Data.ConnectionUI
                     {
                         Properties.SelectedAuthenticationMethod = SqlAuthenticationMethod.SqlPassword;
                     }
+                }
+                if (Properties.SelectedAuthenticationMethod == SqlAuthenticationMethod.NotSpecified)
+                {
+                    Properties.UseWindowsAuthentication = true;
                 }
                 if (!string.IsNullOrEmpty(cb.DataSource))
                 {
@@ -302,6 +320,7 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (!_loading)
             {
+                ResetForm();
                 Properties.ServerName = serverComboBox.Text;
                 if (serverComboBox.Items.Count == 0 && _serverEnumerationTask == null)
                 {
@@ -315,6 +334,7 @@ namespace Microsoft.Data.ConnectionUI
 
         private void RefreshServers(object sender, EventArgs e)
         {
+            ResetForm();
             serverComboBox.Items.Clear();
             EnumerateServers(sender, e);
         }
@@ -323,6 +343,7 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (!_loading)
             {
+                ResetForm();
                 if (authenticationDropdown.SelectedIndex == IntegratedAuthenticationSelected)
                 {
                     Properties.UseWindowsAuthentication = true;
@@ -378,6 +399,7 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (!_loading)
             {
+                ResetForm();
                 Properties.UserName = userNameTextBox.Text;
             }
             SetDatabaseGroupBoxStatus(sender, e);
@@ -388,6 +410,7 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (!_loading)
             {
+                ResetForm();
                 Properties.Password = passwordTextBox.Text;
                 passwordTextBox.Text = passwordTextBox.Text; // forces reselection of all text
             }
@@ -398,6 +421,7 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (!_loading)
             {
+                ResetForm();
                 Properties.TrustServerCertificate = trustServerCertificateCheckBox.Checked;
             }
         }
@@ -411,6 +435,7 @@ namespace Microsoft.Data.ConnectionUI
 
         private void SetDatabaseOption(object sender, EventArgs e)
         {
+            ResetForm();
             if (selectDatabaseRadioButton.Checked)
             {
                 SetDatabase(sender, e);
@@ -433,8 +458,11 @@ namespace Microsoft.Data.ConnectionUI
 
         private void SetDatabase(object sender, EventArgs e)
         {
-            if (!_loading)
+            if (!_loading &&
+                (!(selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)) &&
+                selectDatabaseComboBox.Text != loadingItem.ToString())
             {
+                ResetForm();
                 Properties.DatabaseName = selectDatabaseComboBox.Text;
                 if (selectDatabaseComboBox.Items.Count == 0 && _databaseEnumerationTask?.IsCompleted != true)
                 {
@@ -448,7 +476,14 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (selectDatabaseComboBox.Items.Count == 0)
             {
+                var droppedDown = selectDatabaseComboBox.DroppedDown ||
+                    (e is KeyEventArgs keyEventArgs && keyEventArgs.KeyCode == Keys.Down);
                 selectDatabaseComboBox.Items.Add(loadingItem);
+                if (droppedDown)
+                {
+                    selectDatabaseComboBox.DroppedDown = true;
+                }
+
                 var currentCursor = Cursor.Current;
                 Cursor.Current = Cursors.WaitCursor;
                 try
@@ -469,6 +504,7 @@ namespace Microsoft.Data.ConnectionUI
         {
             if (!_loading)
             {
+                ResetForm();
                 if (selectDatabaseRadioButton.Checked)
                 {
                     Properties.DatabaseFile = null;
@@ -497,6 +533,7 @@ namespace Microsoft.Data.ConnectionUI
 
         private void Browse(object sender, EventArgs e)
         {
+            ResetForm();
             var fileDialog = new OpenFileDialog
             {
                 Title = "Select SQL Server Database File",
@@ -523,6 +560,7 @@ namespace Microsoft.Data.ConnectionUI
 
         private void TrimControlText(object sender, EventArgs e)
         {
+            ResetForm();
             (sender as Control).Text.Trim();
         }
 
@@ -626,7 +664,8 @@ namespace Microsoft.Data.ConnectionUI
                     }
                     else
                     {
-                        command.CommandText = "SELECT name FROM master.dbo.sysdatabases WHERE HAS_DBACCESS(name) = 1 ORDER BY name";
+                        //[dbid]>4 excludes system databases
+                        command.CommandText = "SELECT name FROM master.dbo.sysdatabases WHERE HAS_DBACCESS(name) = 1 AND [dbid]>4 ORDER BY name";
                     }
 
                     // Execute the command
@@ -647,7 +686,10 @@ namespace Microsoft.Data.ConnectionUI
                         {
                             try
                             {
+                                ResetForm();
+                                connectionerrorLabel.Visible = true;
                                 selectDatabaseComboBox.Items.Clear();
+                                selectDatabaseComboBox.Text = "";
                             }
                             catch { }
                         });
@@ -670,7 +712,7 @@ namespace Microsoft.Data.ConnectionUI
             {
                 for (int i = 0; i < dataTable.Rows.Count; i++)
                 {
-                    _databases.Add(dataTable.Rows[i]["name"]);
+                    _databases.Add(dataTable.Rows[i]["name"].ToString());
                 }
             }
 
@@ -687,6 +729,7 @@ namespace Microsoft.Data.ConnectionUI
 
         private void PopulateDatabaseComboBox()
         {
+            var droppedDown = selectDatabaseComboBox.DroppedDown;
             if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
             {
                 try
@@ -697,9 +740,17 @@ namespace Microsoft.Data.ConnectionUI
             }
             if (selectDatabaseComboBox.Items.Count == 0 && _databases.Count > 0)
             {
+                if (selectDatabaseComboBox.Text == loadingItem.ToString())
+                {
+                    selectDatabaseComboBox.Text = "";
+                }
                 selectDatabaseComboBox.Items.AddRange(_databases.ToArray());
             }
             _databaseEnumerationTask = null;
+            if (droppedDown)
+            {
+                selectDatabaseComboBox.DroppedDown = true;
+            }
         }
 
         private static string TextWithoutMnemonics(string text)
@@ -886,17 +937,17 @@ namespace Microsoft.Data.ConnectionUI
             {
                 get
                 {
-                    return (bool)_properties["Trust Server Certificate"];
+                    return (bool)_properties[SqlHelper.TrustServerCertificate];
                 }
                 set
                 {
                     if (value)
                     {
-                        _properties["Trust Server Certificate"] = value;
+                        _properties[SqlHelper.TrustServerCertificate] = value;
                     }
                     else
                     {
-                        _properties.Reset("Trust Server Certificate");
+                        _properties.Reset(SqlHelper.TrustServerCertificate);
                     }
                 }
             }

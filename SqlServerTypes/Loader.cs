@@ -86,8 +86,7 @@ namespace SqlServerTypes
 
         private static void LoadNativeAssembly(string fullAssemblyName)
         {
-            var ptr = LoadLibrary(fullAssemblyName);
-            if (ptr == IntPtr.Zero)
+            if (LoadLibrary(fullAssemblyName) == IntPtr.Zero)
             {
                 throw new Exception(string.Format("Error loading {0} (ErrorCode: {1})", fullAssemblyName, Marshal.GetLastWin32Error()));
             }

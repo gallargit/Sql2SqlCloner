@@ -121,10 +121,10 @@ namespace Sql2SqlCloner
                 foreach (var filter in (IList<string>)filterDataLoading.Replace(Environment.NewLine, "").Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).ToList())
                 {
                     var split = filter.Trim().Split(' ').ToList();
-                    var key = AddBrackets(split[0].ToUpperInvariant());
+                    var key = SqlSchemaObject.AddBrackets(split[0].ToUpperInvariant());
                     if (split.Count > 2 && split[1].Equals("WHERE", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        WHERECONDITIONS[key] = string.Join(" ", new[] { "WHERE" }.Concat(new[] { AddBrackets(split.Skip(2).First()) }).Concat(split.Skip(3))).Trim();
+                        WHERECONDITIONS[key] = string.Join(" ", new[] { "WHERE" }.Concat(new[] { SqlSchemaObject.AddBrackets(split.Skip(2).First()) }).Concat(split.Skip(3))).Trim();
                     }
                     else if (split.Count > 2 && split[1].Equals("TOP", StringComparison.InvariantCultureIgnoreCase))
                     {
@@ -139,28 +139,6 @@ namespace Sql2SqlCloner
                     }
                 }
             }
-        }
-
-        private string AddBrackets(string item)
-        {
-            var itemWithBrackets = "";
-            foreach (var itemSplitDot in item.Split('.'))
-            {
-                if (itemWithBrackets != "")
-                {
-                    itemWithBrackets += ".";
-                }
-                if (!itemSplitDot.StartsWith("["))
-                {
-                    itemWithBrackets += "[";
-                }
-                itemWithBrackets += itemSplitDot;
-                if (!itemSplitDot.EndsWith("]"))
-                {
-                    itemWithBrackets += "]";
-                }
-            }
-            return itemWithBrackets;
         }
 
         private void LoadTreeNodes(bool sortByRecords)

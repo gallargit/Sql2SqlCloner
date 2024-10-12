@@ -50,6 +50,7 @@
             this.attachDatabaseRadioButton = new System.Windows.Forms.RadioButton();
             this.selectDatabaseComboBox = new System.Windows.Forms.ComboBox();
             this.selectDatabaseRadioButton = new System.Windows.Forms.RadioButton();
+            this.connectionerrorLabel = new System.Windows.Forms.Label();
             this.serverTableLayoutPanel.SuspendLayout();
             this.logonGroupBox.SuspendLayout();
             this.loginTableLayoutPanel.SuspendLayout();
@@ -228,10 +229,18 @@
             this.selectDatabaseRadioButton.Name = "selectDatabaseRadioButton";
             this.selectDatabaseRadioButton.CheckedChanged += new System.EventHandler(this.SetDatabaseOption);
             // 
+            // connectionerrorLabel
+            // 
+            resources.ApplyResources(this.connectionerrorLabel, "connectionerrorLabel");
+            this.connectionerrorLabel.FlatStyle = System.Windows.Forms.FlatStyle.System;
+            this.connectionerrorLabel.ForeColor = System.Drawing.Color.Red;
+            this.connectionerrorLabel.Name = "connectionerrorLabel";
+            // 
             // SqlConnectionUIControl
             // 
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.Controls.Add(this.connectionerrorLabel);
             this.Controls.Add(this.databaseGroupBox);
             this.Controls.Add(this.logonGroupBox);
             this.Controls.Add(this.serverTableLayoutPanel);
@@ -276,5 +285,6 @@
 		private System.Windows.Forms.Button browseButton;
 		private System.Windows.Forms.Label logicalDatabaseNameLabel;
 		private System.Windows.Forms.TextBox logicalDatabaseNameTextBox;
+        private System.Windows.Forms.Label connectionerrorLabel;
     }
 }

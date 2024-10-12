@@ -9,7 +9,6 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Sql2SqlCloner")]
-[assembly: AssemblyCopyright("Copyright © 2015,2024")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

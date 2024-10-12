@@ -19,14 +19,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         {
             get
             {
-                var itemWithBrackets = "";
-                Name.Split('.').ToList().ForEach(itemSplitDot =>
-                    itemWithBrackets += ((itemWithBrackets != "") ? "." : "") +
-                        (itemSplitDot.StartsWith("[") ? "" : "[") +
-                        itemSplitDot +
-                        (itemSplitDot.EndsWith("]") ? "" : "]"));
-
-                return itemWithBrackets;
+                return AddBrackets(Name);
             }
         }
         [System.ComponentModel.Browsable(false)]
@@ -35,6 +28,24 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             get
             {
                 return Name.Replace("[", "").Replace("]", "");
+            }
+        }
+
+        public static string AddBrackets(string itemname)
+        {
+            if (string.IsNullOrEmpty(itemname))
+            {
+                return "";
+            }
+
+            var nameSplit = itemname.Split('.').ToList();
+            if (nameSplit.Count < 2)
+            {
+                return $"[{itemname}]";
+            }
+            else
+            {
+                return $"[{nameSplit[0]}].[{string.Join(".", nameSplit.Skip(1))}]";
             }
         }
     }

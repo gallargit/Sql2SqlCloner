@@ -11,7 +11,7 @@
 namespace Sql2SqlCloner.Properties
 {
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.9.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.10.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase
     {
 
@@ -22,171 +22,6 @@ namespace Sql2SqlCloner.Properties
             get
             {
                 return defaultInstance;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string SourceServer
-        {
-            get
-            {
-                return ((string)(this["SourceServer"]));
-            }
-            set
-            {
-                this["SourceServer"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string DestinationServer
-        {
-            get
-            {
-                return ((string)(this["DestinationServer"]));
-            }
-            set
-            {
-                this["DestinationServer"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool CopySchema
-        {
-            get
-            {
-                return ((bool)(this["CopySchema"]));
-            }
-            set
-            {
-                this["CopySchema"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool CopyData
-        {
-            get
-            {
-                return ((bool)(this["CopyData"]));
-            }
-            set
-            {
-                this["CopyData"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool CopyConstraints
-        {
-            get
-            {
-                return ((bool)(this["CopyConstraints"]));
-            }
-            set
-            {
-                this["CopyConstraints"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DropAndRecreateObjects
-        {
-            get
-            {
-                return ((bool)(this["DropAndRecreateObjects"]));
-            }
-            set
-            {
-                this["DropAndRecreateObjects"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool CopySecurity
-        {
-            get
-            {
-                return ((bool)(this["CopySecurity"]));
-            }
-            set
-            {
-                this["CopySecurity"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool CopyExtendedProperties
-        {
-            get
-            {
-                return ((bool)(this["CopyExtendedProperties"]));
-            }
-            set
-            {
-                this["CopyExtendedProperties"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool CopyPermissions
-        {
-            get
-            {
-                return ((bool)(this["CopyPermissions"]));
-            }
-            set
-            {
-                this["CopyPermissions"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool CopyFullText
-        {
-            get
-            {
-                return ((bool)(this["CopyFullText"]));
-            }
-            set
-            {
-                this["CopyFullText"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool StopIfErrors
-        {
-            get
-            {
-                return ((bool)(this["StopIfErrors"]));
-            }
-            set
-            {
-                this["StopIfErrors"] = value;
             }
         }
 
@@ -222,46 +57,106 @@ namespace Sql2SqlCloner.Properties
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DisableNotForReplication
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CopyConstraints
         {
             get
             {
-                return ((bool)(this["DisableNotForReplication"]));
+                return ((bool)(this["CopyConstraints"]));
             }
             set
             {
-                this["DisableNotForReplication"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool DeleteDestinationTables
-        {
-            get
-            {
-                return ((bool)(this["DeleteDestinationTables"]));
-            }
-            set
-            {
-                this["DeleteDestinationTables"] = value;
+                this["CopyConstraints"] = value;
             }
         }
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool IgnoreFileGroup
+        public bool CopyData
         {
             get
             {
-                return ((bool)(this["IgnoreFileGroup"]));
+                return ((bool)(this["CopyData"]));
             }
             set
             {
-                this["IgnoreFileGroup"] = value;
+                this["CopyData"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CopyExtendedProperties
+        {
+            get
+            {
+                return ((bool)(this["CopyExtendedProperties"]));
+            }
+            set
+            {
+                this["CopyExtendedProperties"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CopyFullText
+        {
+            get
+            {
+                return ((bool)(this["CopyFullText"]));
+            }
+            set
+            {
+                this["CopyFullText"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CopySchema
+        {
+            get
+            {
+                return ((bool)(this["CopySchema"]));
+            }
+            set
+            {
+                this["CopySchema"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CopyPermissions
+        {
+            get
+            {
+                return ((bool)(this["CopyPermissions"]));
+            }
+            set
+            {
+                this["CopyPermissions"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool CopySecurity
+        {
+            get
+            {
+                return ((bool)(this["CopySecurity"]));
+            }
+            set
+            {
+                this["CopySecurity"] = value;
             }
         }
 
@@ -283,6 +178,81 @@ namespace Sql2SqlCloner.Properties
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DeleteDestinationTables
+        {
+            get
+            {
+                return ((bool)(this["DeleteDestinationTables"]));
+            }
+            set
+            {
+                this["DeleteDestinationTables"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DestinationServer
+        {
+            get
+            {
+                return ((string)(this["DestinationServer"]));
+            }
+            set
+            {
+                this["DestinationServer"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DisableNotForReplication
+        {
+            get
+            {
+                return ((bool)(this["DisableNotForReplication"]));
+            }
+            set
+            {
+                this["DisableNotForReplication"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DropAndRecreateObjects
+        {
+            get
+            {
+                return ((bool)(this["DropAndRecreateObjects"]));
+            }
+            set
+            {
+                this["DropAndRecreateObjects"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IgnoreFileGroup
+        {
+            get
+            {
+                return ((bool)(this["IgnoreFileGroup"]));
+            }
+            set
+            {
+                this["IgnoreFileGroup"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool IncrementalDataCopy
         {
             get
@@ -292,6 +262,36 @@ namespace Sql2SqlCloner.Properties
             set
             {
                 this["IncrementalDataCopy"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SourceServer
+        {
+            get
+            {
+                return ((string)(this["SourceServer"]));
+            }
+            set
+            {
+                this["SourceServer"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool StopIfErrors
+        {
+            get
+            {
+                return ((bool)(this["StopIfErrors"]));
+            }
+            set
+            {
+                this["StopIfErrors"] = value;
             }
         }
     }

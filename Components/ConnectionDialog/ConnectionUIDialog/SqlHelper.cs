@@ -13,6 +13,7 @@ namespace Microsoft.Data.ConnectionUI
 {
     public static class SqlHelper
     {
+        public const string TrustServerCertificate = "Trust Server Certificate";
         public static IEnumerable<string> ListLocalSqlInstances()
         {
             if (Environment.Is64BitOperatingSystem)

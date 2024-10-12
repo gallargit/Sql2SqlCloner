@@ -587,6 +587,8 @@ namespace Microsoft.Data.ConnectionUI
                     }
                     properties.PropertyChanged += ConfigureAcceptButton;
                     _connectionPropertiesTable[SelectedDataSource][SelectedDataProvider] = properties;
+                    properties.Add(SqlHelper.TrustServerCertificate);
+                    properties[SqlHelper.TrustServerCertificate] = true;
                 }
                 return _connectionPropertiesTable[SelectedDataSource][SelectedDataProvider];
             }

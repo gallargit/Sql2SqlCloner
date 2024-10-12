@@ -165,7 +165,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                     ORDER BY sche.name,tab.name,col.column_id";
                 var tablesplit = tableName.Split('.');
                 command.Parameters.Add("@schema", System.Data.SqlDbType.NVarChar).Value = tablesplit[0].Replace("[", "").Replace("]", "");
-                command.Parameters.Add("@table", System.Data.SqlDbType.NVarChar).Value = tablesplit[1].Replace("[", "").Replace("]", "");
+                command.Parameters.Add("@table", System.Data.SqlDbType.NVarChar).Value = string.Join(".", tablesplit.Skip(1)).Replace("[", "").Replace("]", "");
                 var lst = new List<string>();
                 using (var reader = command.ExecuteReader())
                 {

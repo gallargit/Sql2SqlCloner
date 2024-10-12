@@ -265,11 +265,11 @@ namespace Sql2SqlCloner
 
                 try
                 {
-                    var tableName = item.Cells["Table"].Value.ToString();
+                    var tableName = SqlSchemaObject.AddBrackets(item.Cells["Table"].Value.ToString());
                     currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()} / {tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}' {currrow}/{dataGridView1.RowCount}";
                     if (item.Cells["TOP"].Value.ToString() != "0")
                     {
-                        DataTransfer.TransferData(item.Cells["Table"].Value.ToString(), item.Cells["SqlCommand"].Value.ToString());
+                        DataTransfer.TransferData(tableName, item.Cells["SqlCommand"].Value.ToString());
                     }
                     //enable table constraints for standalone tables to avoid a single fat transaction at the end
                     if (string.Equals(item.Cells["HasRelationships"].Value.ToString(), "false", StringComparison.InvariantCultureIgnoreCase))
@@ -285,11 +285,10 @@ namespace Sql2SqlCloner
                     item.Cells["Status"].Value = Properties.Resources.failure;
                     ((Bitmap)item.Cells["Status"].Value).Tag = Constants.ERROR;
                     item.Cells["Result"].Value = exc.Message;
-                    if (exc.InnerException != null)
+                    if (exc.InnerException != null && exc.Message != exc.InnerException.Message)
                     {
-                        item.Cells["Result"].Value = exc.InnerException.Message;
+                        item.Cells["Result"].Value = exc.Message + ". " + exc.InnerException.Message;
                     }
-
                     errorCount++;
                 }
                 backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
