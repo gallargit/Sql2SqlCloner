@@ -32,6 +32,7 @@ namespace Microsoft.Data.ConnectionUI
         private bool currentUserInstanceSetting;
         private ControlProperties _controlProperties;
         private readonly object loadingItem = "(loading...)";
+        private bool droppedDown = false;
 
         public SqlConnectionUIControl(string initialConnectionString)
         {
@@ -212,7 +213,7 @@ namespace Microsoft.Data.ConnectionUI
             if (Properties.ServerName == "." || Properties.ServerName.StartsWith("(local)") || Properties.ServerName.StartsWith("localhost") ||
                 Properties.ServerName.StartsWith("127.0.0.1"))
             {
-                _databaseEnumerationTask = Task.Run(() => EnumerateDatabases(true, 1));
+                _databaseEnumerationTask = Task.Run(() => EnumerateDatabases(1));
             }
 
             _loading = false;
@@ -467,13 +468,17 @@ namespace Microsoft.Data.ConnectionUI
                 if (selectDatabaseComboBox.Items.Count == 0 && _databaseEnumerationTask?.IsCompleted != true)
                 {
                     // Start an enumeration of databases
-                    _databaseEnumerationTask = Task.Run(() => EnumerateDatabases(sender == null && e == null));
+                    _databaseEnumerationTask = Task.Run(() => EnumerateDatabases(0));
                 }
             }
         }
 
         private void EnumerateDatabases(object sender, EventArgs e)
         {
+            if (droppedDown)
+            {
+                return;
+            }
             if (selectDatabaseComboBox.Items.Count == 0)
             {
                 var droppedDown = selectDatabaseComboBox.DroppedDown ||
@@ -490,7 +495,7 @@ namespace Microsoft.Data.ConnectionUI
                 {
                     if (_databaseEnumerationTask?.IsCompleted != true)
                     {
-                        _databaseEnumerationTask = Task.Run(() => EnumerateDatabases());
+                        _databaseEnumerationTask = Task.Run(() => EnumerateDatabases(0));
                     }
                 }
                 finally
@@ -509,7 +514,7 @@ namespace Microsoft.Data.ConnectionUI
                 {
                     Properties.DatabaseFile = null;
                 }
-                else /* if (attachDatabaseRadioButton.Checked) */
+                else
                 {
                     Properties.DatabaseFile = attachDatabaseTextBox.Text;
                 }
@@ -524,7 +529,7 @@ namespace Microsoft.Data.ConnectionUI
                 {
                     Properties.LogicalDatabaseName = null;
                 }
-                else /* if (attachDatabaseRadioButton.Checked) */
+                else
                 {
                     Properties.LogicalDatabaseName = logicalDatabaseNameTextBox.Text;
                 }
@@ -636,76 +641,72 @@ namespace Microsoft.Data.ConnectionUI
             }
         }
 
-        private void EnumerateDatabases(bool force = false, int timeOut = 0)
+        private void EnumerateDatabases(int timeOut)
         {
             // Perform the enumeration
             System.Data.DataTable dataTable = null;
             SqlConnection connection = null;
             System.Data.IDataReader reader = null;
-            if (force || Properties.UseWindowsAuthentication || Properties.SelectedAuthenticationMethod == SqlAuthenticationMethod.SqlPassword)
+            try
             {
-                try
+                // Get a basic connection
+                connection = Properties.GetBasicConnection(timeOut);
+
+                // Create a command to check if the database is on SQL Azure.
+                var command = connection.CreateCommand();
+                command.CommandText = "SELECT CASE WHEN SERVERPROPERTY(N'EDITION') = 'SQL Data Services' OR SERVERPROPERTY(N'EDITION') = 'SQL Azure' THEN 1 ELSE 0 END";
+
+                // Open the connection
+                connection.Open();
+
+                // SQL Azure doesn't support HAS_DBACCESS at this moment.
+                // Change the command text to get database names accordingly
+                if ((int)command.ExecuteScalar() == 1)
                 {
-                    // Get a basic connection
-                    connection = Properties.GetBasicConnection(timeOut);
-
-                    // Create a command to check if the database is on SQL Azure.
-                    var command = connection.CreateCommand();
-                    command.CommandText = "SELECT CASE WHEN SERVERPROPERTY(N'EDITION') = 'SQL Data Services' OR SERVERPROPERTY(N'EDITION') = 'SQL Azure' THEN 1 ELSE 0 END";
-
-                    // Open the connection
-                    connection.Open();
-
-                    // SQL Azure doesn't support HAS_DBACCESS at this moment.
-                    // Change the command text to get database names accordingly
-                    if ((int)command.ExecuteScalar() == 1)
-                    {
-                        command.CommandText = "SELECT name FROM master.dbo.sysdatabases ORDER BY name";
-                    }
-                    else
-                    {
-                        //[dbid]>4 excludes system databases
-                        command.CommandText = "SELECT name FROM master.dbo.sysdatabases WHERE HAS_DBACCESS(name) = 1 AND [dbid]>4 ORDER BY name";
-                    }
-
-                    // Execute the command
-                    reader = command.ExecuteReader();
-
-                    // Read into the data table
-                    dataTable = new System.Data.DataTable
-                    {
-                        Locale = System.Globalization.CultureInfo.CurrentCulture
-                    };
-                    dataTable.Load(reader);
+                    command.CommandText = "SELECT name FROM master.dbo.sysdatabases ORDER BY name";
                 }
-                catch
+                else
                 {
-                    if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
-                    {
-                        selectDatabaseComboBox.Invoke((Action)delegate
-                        {
-                            try
-                            {
-                                ResetForm();
-                                connectionerrorLabel.Visible = true;
-                                selectDatabaseComboBox.Items.Clear();
-                                selectDatabaseComboBox.Text = "";
-                            }
-                            catch { }
-                        });
-                    }
-                    dataTable = new System.Data.DataTable
-                    {
-                        Locale = System.Globalization.CultureInfo.InvariantCulture
-                    };
+                    //[dbid]>4 excludes system databases
+                    command.CommandText = "SELECT name FROM master.dbo.sysdatabases WHERE HAS_DBACCESS(name) = 1 AND [dbid]>4 ORDER BY name";
                 }
-                finally
+
+                // Execute the command
+                reader = command.ExecuteReader();
+
+                // Read into the data table
+                dataTable = new System.Data.DataTable
                 {
-                    reader?.Dispose();
-                    connection?.Dispose();
-                }
+                    Locale = System.Globalization.CultureInfo.CurrentCulture
+                };
+                dataTable.Load(reader);
             }
-
+            catch
+            {
+                if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
+                {
+                    selectDatabaseComboBox.Invoke((Action)delegate
+                    {
+                        try
+                        {
+                            ResetForm();
+                            connectionerrorLabel.Visible = true;
+                            selectDatabaseComboBox.Items.Clear();
+                            selectDatabaseComboBox.Text = "";
+                        }
+                        catch { }
+                    });
+                }
+                dataTable = new System.Data.DataTable
+                {
+                    Locale = System.Globalization.CultureInfo.InvariantCulture
+                };
+            }
+            finally
+            {
+                reader?.Dispose();
+                connection?.Dispose();
+            }
             // Create the object array of database names
             _databases.Clear();
             if (dataTable != null)
@@ -729,7 +730,7 @@ namespace Microsoft.Data.ConnectionUI
 
         private void PopulateDatabaseComboBox()
         {
-            var droppedDown = selectDatabaseComboBox.DroppedDown;
+            droppedDown = selectDatabaseComboBox.DroppedDown;
             if (selectDatabaseComboBox.Items.Count == 1 && selectDatabaseComboBox.Items[0] == loadingItem)
             {
                 try
@@ -751,6 +752,7 @@ namespace Microsoft.Data.ConnectionUI
             {
                 selectDatabaseComboBox.DroppedDown = true;
             }
+            droppedDown = false;
         }
 
         private static string TextWithoutMnemonics(string text)
