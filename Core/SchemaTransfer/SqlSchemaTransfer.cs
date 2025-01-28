@@ -135,14 +135,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
         public IEnumerable<string> GetObjectSource(NamedSmoObject obj)
         {
-            transfer.Options.Indexes =
-                transfer.Options.ClusteredIndexes =
-                    transfer.Options.ColumnStoreIndexes =
-                        transfer.Options.DriIndexes =
-                            transfer.Options.FullTextIndexes =
-                                transfer.Options.NonClusteredIndexes =
-                                    transfer.Options.SpatialIndexes =
-                                        transfer.Options.XmlIndexes = true;
+            transfer.Options.Indexes = transfer.Options.ClusteredIndexes = transfer.Options.ColumnStoreIndexes =
+                transfer.Options.DriIndexes = transfer.Options.FullTextIndexes = transfer.Options.NonClusteredIndexes =
+                transfer.Options.SpatialIndexes = transfer.Options.XmlIndexes = true;
             ResetTransfer();
             transfer.ObjectList.Clear();
             transfer.ObjectList.Add(obj);
@@ -309,14 +304,9 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
 
                 if (obj is View && alterInsteadOfCreate && removeSchemaBinding == false)
                 {
-                    transfer.Options.Indexes =
-                        transfer.Options.ClusteredIndexes =
-                            transfer.Options.ColumnStoreIndexes =
-                                transfer.Options.DriIndexes =
-                                    transfer.Options.FullTextIndexes =
-                                        transfer.Options.NonClusteredIndexes =
-                                            transfer.Options.SpatialIndexes =
-                                                transfer.Options.XmlIndexes = true;
+                    transfer.Options.Indexes = transfer.Options.ClusteredIndexes = transfer.Options.ColumnStoreIndexes =
+                        transfer.Options.DriIndexes = transfer.Options.FullTextIndexes = transfer.Options.NonClusteredIndexes =
+                        transfer.Options.SpatialIndexes = transfer.Options.XmlIndexes = true;
                 }
 
                 ResetTransfer();
@@ -345,11 +335,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     transfer.Options.ScriptDrops = false;
                 }
 
-                bool copyAzureUserToNonAzureDB = (obj is User) &&
-                                                 sourceServer.DatabaseEngineType ==
-                                                 DatabaseEngineType.SqlAzureDatabase &&
-                                                 destinationServer.DatabaseEngineType !=
-                                                 DatabaseEngineType.SqlAzureDatabase;
+                bool copyAzureUserToNonAzureDB = (obj is User) && sourceServer.DatabaseEngineType == DatabaseEngineType.SqlAzureDatabase &&
+                                                 destinationServer.DatabaseEngineType != DatabaseEngineType.SqlAzureDatabase;
                 //system-versioned tables should have their PK created right away
                 transfer.Options.DriPrimaryKey = obj is Table table && (table.GetTableProperty("IsSystemVersioned") ||
                                                                         table.GetTableProperty("IsMemoryOptimized"));
@@ -502,7 +489,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         {
                             existingschemas.Add(obj.Name);
                         }
-
                         if (obj is SecurityPolicy)
                         {
                             LstPostExecutionExecute.Add(scriptRun);
@@ -538,7 +524,6 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             var tokensResult = new List<TokenInfoExtended>();
             var parseOptions = new ParseOptions();
             var scanner = new Scanner(parseOptions);
-
             int state = 0, lastTokenEnd = -1, token;
 
             scanner.SetSource(sql, 0);
@@ -763,7 +748,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         else if (!sourceDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012) &&
                                  destinationDatabase.IsRunningMinimumSQLVersion(SQL_DB_Compatibility.DB_2012))
                         {
-                            //source is old, destination is new, keep old sntax
+                            //source is old, destination is new, keep old syntax
                             sb.Append(strTokenTest);
                         }
 
@@ -884,7 +869,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             //AFTER or UPDATE keywords are treated as TOKEN_ID
                             if (currentToken.Token == (int)Tokens.TOKEN_ID)
                             {
-                                //first pass, either schemaname or tablename
+                                //first pass, either schema name or table name
                                 tokenIDForTrigger++;
                             }
 
@@ -903,7 +888,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                         {
                             if (triggerON)
                             {
-                                //due to an SMO bug sometimes the table's schemaname is not scripted
+                                //due to an SMO bug sometimes the table's schema name is not scripted
                                 //replace here the trigger's table name with the proper one
                                 sb.Append((obj as Trigger)?.Parent);
                                 triggerON = false;
@@ -977,8 +962,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             sb.Append(currentToken.SQL);
                         }
                     }
-                    //replace the scripted object's name with the actual name, this is a workaround
-                    //for an SMO bug, sometimes the object's name is scripted without schema
+                    //replace the scripted object's name with the actual name; this is a workaround
+                    //for an SMO bug: sometimes the object's name is scripted without schema
                     else if ((obj is Default ||
                               obj is Rule ||
                               obj is View ||
@@ -1140,7 +1125,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                             lst.Add(s.DefaultConstraint);
                         }
                     });
-                    currentTable.Indexes.Cast<Index>().ToList().ForEach(s => lst.Add(s));
+                    currentTable.Indexes.Cast<Microsoft.SqlServer.Management.Smo.Index>().ToList().ForEach(s => lst.Add(s));
                     currentTable.ForeignKeys.Cast<ForeignKey>().ToList().ForEach(s => lst.Add(s));
                     currentTable.Triggers.Cast<Trigger>().ToList().ForEach(s => lst.Add(s));
                     currentTable.Checks.Cast<Check>().ToList().ForEach(s => lst.Add(s));
@@ -1148,7 +1133,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 else if (obj is View currentView)
                 {
                     currentView.Columns.Cast<Column>().ToList().ForEach(s => lst.Add(s));
-                    currentView.Indexes.Cast<Index>().ToList().ForEach(s => lst.Add(s));
+                    currentView.Indexes.Cast<Microsoft.SqlServer.Management.Smo.Index>().ToList().ForEach(s => lst.Add(s));
                     currentView.Triggers.Cast<Trigger>().ToList().ForEach(s => lst.Add(s));
                 }
                 else if (obj is StoredProcedure currentProcedure)
@@ -1653,8 +1638,8 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
             }
 
             //clustered indexes should be processed first
-            var indexesSorted = new List<Index>();
-            foreach (Index srcindex in (obj as TableViewBase)?.Indexes)
+            var indexesSorted = new List<Microsoft.SqlServer.Management.Smo.Index>();
+            foreach (Microsoft.SqlServer.Management.Smo.Index srcindex in (obj as TableViewBase)?.Indexes)
             {
                 //clustered index should be first
                 if (srcindex.IndexType == IndexType.ClusteredIndex)
@@ -1680,12 +1665,12 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                 }
             }
 
-            foreach (Index srcindex in indexesSorted)
+            foreach (Microsoft.SqlServer.Management.Smo.Index srcindex in indexesSorted)
             {
                 var existingIndex = false;
                 if (obj is View)
                 {
-                    foreach (Index destIndex in (destinationTable as View)?.Indexes)
+                    foreach (Microsoft.SqlServer.Management.Smo.Index destIndex in (destinationTable as View)?.Indexes)
                     {
                         if (destIndex.Name == srcindex.Name)
                         {
@@ -1714,7 +1699,7 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
                     continue;
                 }
 
-                Index index = new Index(destinationTable, srcindex.Name)
+                Microsoft.SqlServer.Management.Smo.Index index = new Microsoft.SqlServer.Management.Smo.Index(destinationTable, srcindex.Name)
                 {
                     DisallowPageLocks = srcindex.DisallowPageLocks,
                     DisallowRowLocks = srcindex.DisallowRowLocks,

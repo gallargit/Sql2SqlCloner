@@ -69,7 +69,7 @@ namespace Sql2SqlCloner.Core
                 }
                 catch (Exception ex)
                 {
-                    //quick retry to workaround deadlocks
+                    //quick retry to work around deadlocks
                     lasterror = ex.Message;
                     if (ex.InnerException != null)
                     {

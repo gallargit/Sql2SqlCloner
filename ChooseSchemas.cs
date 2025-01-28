@@ -27,7 +27,7 @@ namespace Sql2SqlCloner
         private Dictionary<string, string> WHERECONDITIONS;
         private Dictionary<string, long> TOPROWS;
         private Dictionary<string, string> ORDERBYFIELDS;
-        private Point originalLocation = new Point();
+        private Point originalLocation;
 
         public ChooseSchemas(SqlSchemaTransfer transferSchema, bool closeIfSuccess, bool selectOnlyTables, bool copyOnlySchema, bool autoRun)
         {
@@ -74,6 +74,13 @@ namespace Sql2SqlCloner
             };
             menuOrderBy.Click += MenuOrderBy_Click;
             NodeContextMenu.MenuItems.Add(menuOrderBy);
+
+            var menuCopy = new MenuItem
+            {
+                Text = "Copy"
+            };
+            menuCopy.Click += MenuCopy_Click;
+            NodeContextMenu.MenuItems.Add(menuCopy);
 
             if (!copyOnlySchema && long.TryParse(ConfigurationManager.AppSettings["GlobalTOP"], out long GLOBALTOP) && GLOBALTOP > 0)
             {
@@ -344,6 +351,14 @@ namespace Sql2SqlCloner
                 }
 
                 CurrentNode.Text += FormatCopyData(CurrentTable.RowCount, CurrentTable.TopRecords, CurrentTable.WhereFilter, CurrentTable.OrderByFields);
+            }
+        }
+
+        private void MenuCopy_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(treeView1.SelectedText))
+            {
+                Clipboard.SetText(treeView1.SelectedText);
             }
         }
 

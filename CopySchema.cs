@@ -22,20 +22,20 @@ namespace Sql2SqlCloner
         private readonly SqlSchemaTransfer SchemaTransfer;
         private readonly bool closeIfSuccess;
         private readonly bool disableNotForReplication;
-        private SqlSchemaTransfer stGetData;
         private string lastError = "";
         private string currentlyCopying = "";
         private double current;
         private double currentBackground;
         private int errorCount;
-        private int currrow;
+        private int currentRow;
         private int percentage;
         private bool windowClosing;
         private bool btnPauseEnabled = true;
-        private readonly object inProgress = new object();
+        private DateTime lastUpdate = DateTime.Now;
+        private readonly object objLockInProgress = new object();
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
-        private DateTime lastUpdate = DateTime.Now;
+        private CancellationTokenSource cancellationTokenSource;
 
         public CopySchema(SqlSchemaTransfer transferSchema, IList<SqlSchemaObject> lstObjects,
             bool closeIfSuccess, bool autoStart, bool disableNotForReplication)
@@ -70,7 +70,7 @@ namespace Sql2SqlCloner
             }
         }
 
-        private void btnNext_Click(object sender, EventArgs e)
+        private async void btnNext_Click(object sender, EventArgs e)
         {
             if (btnNext.Text == "Continue")
             {
@@ -93,14 +93,142 @@ namespace Sql2SqlCloner
             Timer1.Start();
             btnNext.Enabled = false;
             Cursor = Cursors.WaitCursor;
-            backgroundWorker1.DoWork += backgroundWorker1_DoWork;
-            backgroundWorker1.RunWorkerCompleted += backgroundWorker1_RunWorkerCompleted;
-            backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
-            backgroundWorker1.WorkerSupportsCancellation = true;
-            backgroundWorker1.WorkerReportsProgress = true;
+
+            cancellationTokenSource = new CancellationTokenSource();
             currentlyCopying = label1.Text = "Copying schema";
             progressBar1.Value = 0;
-            backgroundWorker1.RunWorkerAsync();
+
+            try
+            {
+                await Task.Run(() => DoWork(new Progress<int>(OnProgressChanged), cancellationTokenSource.Token));
+            }
+            catch (OperationCanceledException)
+            {
+                // cancelled
+            }
+            catch (Exception ex)
+            {
+                lastError = ex.Message;
+                errorCount++;
+            }
+
+            OnRunWorkerCompleted();
+        }
+
+        private void OnProgressChanged(int progressPercentage)
+        {
+            lock (objLockInProgress)
+            {
+                Invoke(new Action(() =>
+                {
+                    btnPause.Enabled = btnPauseEnabled;
+                    if (progressBar1.Value < 100 && progressPercentage >= progressBar1.Minimum && progressPercentage <= progressBar1.Maximum)
+                    {
+                        percentage = progressBar1.Value = progressPercentage;
+                        try
+                        {
+                            progressBar1.Value = progressPercentage > 100 ? 100 : progressPercentage;
+                            if (autoScrollGrid.Checked)
+                            {
+                                if (currentRow < dataGridView1.RowCount && currentRow > 7 && dataGridView1.FirstDisplayedScrollingRowIndex != currentRow - 8)
+                                {
+                                    dataGridView1.FirstDisplayedScrollingRowIndex = currentRow - 8;
+                                }
+                                else if (currentRow < 10)
+                                {
+                                    dataGridView1.Refresh();
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                    if (label1.Text != currentlyCopying)
+                    {
+                        label1.Text = currentlyCopying;
+                        var multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
+                        label1.Top = !multiline ? 10 : 3;
+                        label1.Refresh();
+                    }
+                }));
+            }
+        }
+
+        private void OnRunWorkerCompleted()
+        {
+            lock (objLockInProgress)
+            {
+                btnPause.Enabled = false;
+                stopwatch1.Stop();
+                Timer1.Stop();
+                Timer1_Tick(this, EventArgs.Empty);
+                Cursor = Cursors.Default;
+                dataGridView1.Cursor = Cursors.Default;
+                label1.Text = "Operation completed";
+                if (errorCount == 0)
+                {
+                    label1.Text += $" successfully. Schema copied from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
+                }
+                else
+                {
+                    label1.Text += $" with {errorCount} errors";
+                }
+
+                btnCancel.Text = "Close";
+                btnCopyMessages.Visible = true;
+                dataGridView1.Refresh();
+                if (CopyList.Any(t => !string.IsNullOrEmpty(t.Error)))
+                {
+                    autoScrollGrid.Text = "Show errors only";
+                    autoScrollGrid.CheckState = CheckState.Unchecked;
+                }
+                else
+                {
+                    autoScrollGrid.Visible = false;
+                }
+                if (closeIfSuccess || !Properties.Settings.Default.StopIfErrors)
+                {
+                    if (CopyList.All(t => string.IsNullOrEmpty(t.Error)) || !Properties.Settings.Default.StopIfErrors)
+                    {
+                        //no errors, keep on copying table data if any tables exist
+                        if (CopyList.OfType<SqlSchemaTable>().Any())
+                        {
+                            DialogResult = DialogResult.OK;
+                            Close();
+                        }
+                        else
+                        {
+                            MessageBox.Show("No tables found to copy data from", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                    else
+                    {
+                        btnCancel.Text = "Close";
+                        if (CopyList.OfType<SqlSchemaTable>().Any(t => !string.IsNullOrEmpty(t.Error)))
+                        {
+                            //table errors happened, can't continue
+                            MessageBox.Show($"Error occurred. Last error was: {lastError}");
+                        }
+                        else
+                        {
+                            //non-table errors, can continue
+                            MessageBox.Show($"Error occurred. Last error was: {lastError}{Environment.NewLine}{Environment.NewLine}Click on 'Continue' to go on");
+                            btnNext.Text = "Continue";
+                            btnPause.Enabled = false;
+                            btnNext.Enabled = true;
+                        }
+                    }
+                }
+                else
+                {
+                    if (!closeIfSuccess && errorCount == 0)
+                    {
+                        btnPause.Text = "Start over";
+                        btnPause.Enabled = true;
+                    }
+                    MessageBox.Show($"{label1.Text}", "Finished", MessageBoxButtons.OK,
+                        errorCount == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                }
+            }
         }
 
         public void DeleteCallback(NamedSmoObject currObject)
@@ -133,7 +261,7 @@ namespace Sql2SqlCloner
                 {
                     return;
                 }
-                if (backgroundWorker1.CancellationPending)
+                if (cancellationTokenSource.IsCancellationRequested)
                 {
                     break;
                 }
@@ -183,7 +311,7 @@ namespace Sql2SqlCloner
             }
         }
 
-        private void backgroundWorker1_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
+        private void DoWork(IProgress<int> progress, CancellationToken token)
         {
             if (Properties.Settings.Default.ClearDestinationDatabase)
             {
@@ -202,7 +330,7 @@ namespace Sql2SqlCloner
                 RefreshDataGrid();
 
                 currentlyCopying = $"Clearing destination database {SchemaTransfer.DestinationCxInfo()}";
-                backgroundWorker1.ReportProgress(0);
+                progress.Report(0);
                 try
                 {
                     SchemaTransfer.ClearDestinationDatabase(callback: DeleteCallback);
@@ -224,7 +352,7 @@ namespace Sql2SqlCloner
                 "'(CHANGE_RETENTION = ' + CAST(retention_period AS VARCHAR) + '  ' + retention_period_units_desc + ', AUTO_CLEANUP = ' + CASE WHEN is_auto_cleanup_on='1' THEN 'ON' ELSE 'OFF' END  +')'" +
                 $" FROM sys.change_tracking_databases WHERE UPPER(DB_NAME(database_id))= UPPER('{SchemaTransfer.SourceDatabaseName}')) END");
 
-            backgroundWorker1.ReportProgress(0);
+            progress.Report(0);
             currentlyCopying = $"Copying schema from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
             bool overrideCollation, useSourceCollation;
             SchemaTransfer.NoCollation = false;
@@ -341,7 +469,7 @@ namespace Sql2SqlCloner
                         {
                             return;
                         }
-                        if (backgroundWorker1.CancellationPending)
+                        if (token.IsCancellationRequested)
                         {
                             break;
                         }
@@ -350,6 +478,11 @@ namespace Sql2SqlCloner
                             SchemaTransfer.TransferObject(item.Object, Properties.Settings.Default.DropAndRecreateObjects && !Properties.Settings.Default.ClearDestinationDatabase,
                                                          overrideCollation, useSourceCollation, false, null);
                             item.Status = Properties.Resources.success;
+                            Invoke(new Action(() =>
+                            {
+                                dataGridView1.Update();
+                                dataGridView1.Refresh();
+                            }));
                             item.Status.Tag = Constants.OK;
                             item.Error = "";
                             if (item.Object is DatabaseDdlTrigger)
@@ -427,8 +560,8 @@ namespace Sql2SqlCloner
                         if (retries == 1)
                         {
                             current++;
-                            backgroundWorker1.ReportProgress((int)((current + currentBackground) / max * 100.0));
-                            currrow++;
+                            progress.Report((int)((current + currentBackground) / max * 100.0));
+                            currentRow++;
                         }
                     }
                     lstDelete.ForEach(item => SchemaTransfer.RunInDestination($"SELECT '{item.Replace("'", "''")}'"));
@@ -470,7 +603,7 @@ namespace Sql2SqlCloner
                         {
                             HandleWarning(item, ex);
                         }
-                        backgroundWorker1.ReportProgress((int)((current += 2) / max * 100.0));
+                        progress.Report((int)((current += 2) / max * 100.0));
                     }
                     if (windowClosing)
                     {
@@ -494,7 +627,7 @@ namespace Sql2SqlCloner
                         {
                             HandleWarning(item, ex);
                         }
-                        backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
+                        progress.Report((int)((++current) / max * 100.0));
                     }
                     current = savecurrent + CopyList.Count(i => i.Type == "Table" || i.Type == "View");
 
@@ -514,7 +647,7 @@ namespace Sql2SqlCloner
                             pause.WaitOne(Timeout.Infinite);
                             currentlyCopying = $"Processing check {item.Name}  {currentItem}/{totalItemsCount}";
                             SchemaTransfer.ApplyChecks(item.Object, disableNotForReplication);
-                            backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
+                            progress.Report((int)((++current) / max * 100.0));
                         }
                         catch (Exception ex)
                         {
@@ -544,9 +677,9 @@ namespace Sql2SqlCloner
                 currentlyCopying = "Processing extended properties";
                 try
                 {
-                    backgroundWorker1.ReportProgress((int)(current / max * 100.0));
+                    progress.Report((int)(current / max * 100.0));
                     SchemaTransfer.CopyExtendedProperties(CopyList.Select(o => o.Object));
-                    backgroundWorker1.ReportProgress((int)((current += CopyList.Count / 5.0) / max * 100.0));
+                    progress.Report((int)((current += CopyList.Count / 5.0) / max * 100.0));
                 }
                 catch (Exception ex)
                 {
@@ -566,7 +699,7 @@ namespace Sql2SqlCloner
                 {
                     //not needed SchemaTransfer.CopyPermissions();
                     SchemaTransfer.CopyRolePermissions();
-                    backgroundWorker1.ReportProgress((int)((current += CopyList.Count / 6.0) / max * 100.0));
+                    progress.Report((int)((current += CopyList.Count / 6.0) / max * 100.0));
                 }
                 catch (Exception ex)
                 {
@@ -593,120 +726,7 @@ namespace Sql2SqlCloner
             }
             SchemaTransfer.EnableDestinationDDLTriggers();
             percentage = 100;
-            backgroundWorker1.ReportProgress(100);
-        }
-
-        private void backgroundWorker1_ProgressChanged(object sender, System.ComponentModel.ProgressChangedEventArgs e)
-        {
-            lock (inProgress)
-            {
-                btnPause.Enabled = btnPauseEnabled;
-                if (progressBar1.Value < 100 && e.ProgressPercentage >= progressBar1.Minimum && e.ProgressPercentage <= progressBar1.Maximum)
-                {
-                    percentage = progressBar1.Value = e.ProgressPercentage;
-                    try
-                    {
-                        progressBar1.Value = e.ProgressPercentage > 100 ? 100 : e.ProgressPercentage;
-                        if (autoScrollGrid.Checked)
-                        {
-                            if (currrow < dataGridView1.RowCount && currrow > 7 && dataGridView1.FirstDisplayedScrollingRowIndex != currrow - 8)
-                            {
-                                dataGridView1.FirstDisplayedScrollingRowIndex = currrow - 8;
-                            }
-                            else if (currrow < 10)
-                            {
-                                dataGridView1.Refresh();
-                            }
-                        }
-                    }
-                    catch { }
-                }
-                if (label1.Text != currentlyCopying)
-                {
-                    label1.Text = currentlyCopying;
-                    var multiline = label1.Height - label1.Padding.Top - label1.Padding.Bottom > label1.Font.Size * 2;
-                    label1.Top = !multiline ? 10 : 3;
-                    label1.Refresh();
-                }
-            }
-        }
-
-        private void backgroundWorker1_RunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
-        {
-            lock (inProgress)
-            {
-                btnPause.Enabled = false;
-                stopwatch1.Stop();
-                Timer1.Stop();
-                Timer1_Tick(sender, e);
-                Cursor = Cursors.Default;
-                dataGridView1.Cursor = Cursors.Default;
-                label1.Text = "Operation completed";
-                if (errorCount == 0)
-                {
-                    label1.Text += $" successfully. Schema copied from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
-                }
-                else
-                {
-                    label1.Text += $" with {errorCount} errors";
-                }
-
-                btnCancel.Text = "Close";
-                btnCopyMessages.Visible = true;
-                dataGridView1.Refresh();
-                if (CopyList.Any(t => !string.IsNullOrEmpty(t.Error)))
-                {
-                    autoScrollGrid.Text = "Show errors only";
-                    autoScrollGrid.CheckState = CheckState.Unchecked;
-                }
-                else
-                {
-                    autoScrollGrid.Visible = false;
-                }
-                if (closeIfSuccess || !Properties.Settings.Default.StopIfErrors)
-                {
-                    if (CopyList.All(t => string.IsNullOrEmpty(t.Error)) || !Properties.Settings.Default.StopIfErrors)
-                    {
-                        //no errors, keep on copying table data if any tables exist
-                        if (CopyList.OfType<SqlSchemaTable>().Any())
-                        {
-                            DialogResult = DialogResult.OK;
-                            Close();
-                        }
-                        else
-                        {
-                            MessageBox.Show("No tables found to copy data from", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
-                    }
-                    else
-                    {
-                        btnCancel.Text = "Close";
-                        if (CopyList.OfType<SqlSchemaTable>().Any(t => !string.IsNullOrEmpty(t.Error)))
-                        {
-                            //table errors happened, can't continue
-                            MessageBox.Show($"Error ocurred. Last error was: {lastError}");
-                        }
-                        else
-                        {
-                            //non-table errors, can continue
-                            MessageBox.Show($"Error ocurred. Last error was: {lastError}{Environment.NewLine}{Environment.NewLine}Click on 'Continue' to go on");
-                            btnNext.Text = "Continue";
-                            btnPause.Enabled = false;
-                            btnNext.Enabled = true;
-                        }
-                    }
-                }
-                else
-                {
-                    if (!closeIfSuccess && errorCount == 0)
-                    {
-                        btnPause.Text = "Start over";
-                        btnPause.Enabled = true;
-                    }
-                    MessageBox.Show($"{label1.Text}", "Finished", MessageBoxButtons.OK,
-                        errorCount == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
-                }
-            }
+            progress.Report(100);
         }
 
         private void HandleWarning(SqlSchemaObject item, Exception ex)
@@ -736,9 +756,9 @@ namespace Sql2SqlCloner
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
-            if (backgroundWorker1.IsBusy)
+            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
             {
-                backgroundWorker1.CancelAsync();
+                cancellationTokenSource.Cancel();
                 DialogResult = DialogResult.Abort;
                 Environment.Exit(0);
                 return;
@@ -900,44 +920,15 @@ namespace Sql2SqlCloner
                 dataGridView1.Rows[0].Cells[0].Value is Bitmap &&
                 (dataGridView1.Rows[0].Cells[0].Value as Bitmap).Tag != null)
             {
-                waiting = (dataGridView1.Rows[0].Cells[0].Value as Bitmap)?.Tag.ToString() == Constants.WAITING;
+                waiting = (dataGridView1.Rows[0].Cells[0].Value as Bitmap).Tag.ToString() == Constants.WAITING;
             }
-            if (!waiting && e.RowIndex > -1)
+            if (e.RowIndex >= 0 && !waiting)
             {
-                var objname = dataGridView1.Rows[e.RowIndex].Cells[4].Value.ToString().Replace("[", "").Replace("]", "");
-                if (e.ColumnIndex == 5 && !string.IsNullOrEmpty(dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value.ToString()))
+                var item = dataGridView1.Rows[e.RowIndex].DataBoundItem as SqlSchemaObject;
+                if (item != null && !string.IsNullOrEmpty(item.Error))
                 {
-                    NotepadHelper.ShowMessage(dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value.ToString(), objname);
-                    return;
+                    MessageBox.Show(item.Error, item.Name, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
-                if (stGetData == null)
-                {
-                    stGetData = new SqlSchemaTransfer(SchemaTransfer.SourceConnectionString.Replace("=ADMIN:", "="), SchemaTransfer.DestinationConnectionString, true, null, SchemaTransfer.CancelToken)
-                    {
-                        SourceObjects = SchemaTransfer.SourceObjects,
-                        DestinationObjects = SchemaTransfer.DestinationObjects
-                    };
-                }
-                try
-                {
-                    if (e.RowIndex > -1)
-                    {
-                        var sb = new StringBuilder();
-                        foreach (var objecttoscript in SchemaTransfer.SourceObjects.Where
-                            (o => o.Type == dataGridView1.Rows[e.RowIndex].Cells[2].Value.ToString() && o.Name == objname))
-                        {
-                            foreach (var item in stGetData.GetObjectSource(objecttoscript.Object))
-                            {
-                                sb.Append(item).Append(Environment.NewLine).Append("GO").Append(Environment.NewLine);
-                            }
-                        }
-                        if (sb.Length > 0)
-                        {
-                            NotepadHelper.ShowMessage(sb.ToString(), objname);
-                        }
-                    }
-                }
-                catch { }
             }
         }
     }

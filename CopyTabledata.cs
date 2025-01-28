@@ -18,21 +18,22 @@ namespace Sql2SqlCloner
 {
     public sealed partial class CopyTabledata : Form
     {
+        private const string RecordsCopied = " records copied";
         public IList<SqlSchemaTable> CopyList { get; }
         private readonly SqlDataTransfer DataTransfer;
         private readonly SqlSchemaTransfer SchemaTransfer;
-        private int currrow;
+        private int currentRow;
         private int errorCount;
         private int percentage;
         private string currentlyCopying = "";
         private string lastError = "";
         private readonly bool selectOnlyTables;
         private readonly DateTime? initialTime;
-        private readonly object inProgress = new object();
+        private readonly object objLockInProgress = new object();
+        private readonly object objLockCollate = new object();
         private readonly Stopwatch stopwatch1 = new Stopwatch();
         private readonly ManualResetEvent pause = new ManualResetEvent(true);
-        private readonly object objLock = new object();
-        private const string RecordsCopied = " records copied";
+        private CancellationTokenSource cancellationTokenSource;
 
         public CopyTabledata(IList<SqlSchemaTable> list, SqlDataTransfer initialdatatransfer, SqlSchemaTransfer initialschematransfer,
             bool startImmediately, bool convertCollation, bool selectOnlyTables, DateTime? initialTime)
@@ -158,7 +159,7 @@ namespace Sql2SqlCloner
                                         selectList.Append(selectList.Length == 0 ? " " : ",");
                                         if (!string.IsNullOrEmpty(col.Collation))
                                         {
-                                            lock (objLock)
+                                            lock (objLockCollate)
                                             {
                                                 selectList.Append(col).Append(" COLLATE ").Append(
                                                     destinationTable.Columns[col.Name].Collation).Append(" AS ").Append(col);
@@ -216,7 +217,7 @@ namespace Sql2SqlCloner
             }
         }
 
-        private void btnNext_Click(object sender, EventArgs e)
+        private async void btnNext_Click(object sender, EventArgs e)
         {
             if (Properties.Settings.Default.ClearDestinationDatabase &&
                 ConfigurationManager.AppSettings["DeleteDatabaseDataConfirm"]?.Equals("true", StringComparison.InvariantCultureIgnoreCase) == true &&
@@ -232,17 +233,18 @@ namespace Sql2SqlCloner
             }
             btnNext.Enabled = false;
             Cursor = Cursors.WaitCursor;
-            backgroundWorker1.DoWork += backgroundWorker1_DoWork;
-            backgroundWorker1.RunWorkerCompleted += backgroundWorker1_RunWorkerCompleted;
-            backgroundWorker1.ProgressChanged += backgroundWorker1_ProgressChanged;
-            backgroundWorker1.WorkerSupportsCancellation = true;
-            backgroundWorker1.WorkerReportsProgress = true;
             label1.Text = $"Copying data in progress from: '{SchemaTransfer.SourceCxInfo()}' to: '{SchemaTransfer.DestinationCxInfo()}'";
             progressBar1.Value = 0;
-            backgroundWorker1.RunWorkerAsync();
+
+            var progress = new Progress<int>(ReportProgress);
+            cancellationTokenSource = new CancellationTokenSource();
+
+            await Task.Run(() => DoWork(progress, cancellationTokenSource.Token));
+
+            RunWorkerCompleted();
         }
 
-        private void backgroundWorker1_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
+        private void DoWork(IProgress<int> progress, CancellationToken token)
         {
             double current = 0;
             double max = dataGridView1.Rows.Count;
@@ -252,13 +254,13 @@ namespace Sql2SqlCloner
             foreach (DataGridViewRow item in dataGridView1.Rows)
             {
                 pause.WaitOne(Timeout.Infinite);
-                currrow++;
+                currentRow++;
                 if (item.IsNewRow)
                 {
                     continue;
                 }
 
-                if (backgroundWorker1.CancellationPending)
+                if (token.IsCancellationRequested)
                 {
                     break;
                 }
@@ -266,7 +268,7 @@ namespace Sql2SqlCloner
                 try
                 {
                     var tableName = SqlSchemaObject.AddBrackets(item.Cells["Table"].Value.ToString());
-                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()} / {tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}' {currrow}/{dataGridView1.RowCount}";
+                    currentlyCopying = $"Copying {item.Cells["TOP"].Value} records from: '{SchemaTransfer.SourceCxInfo()} / {tableName.Replace("[", "").Replace("]", "")}' to: '{SchemaTransfer.DestinationCxInfo()}' {currentRow}/{dataGridView1.RowCount}";
                     if (item.Cells["TOP"].Value.ToString() != "0")
                     {
                         DataTransfer.TransferData(tableName, item.Cells["SqlCommand"].Value.ToString());
@@ -277,8 +279,13 @@ namespace Sql2SqlCloner
                         DataTransfer.EnableTableConstraints(tableName);
                     }
                     item.Cells["Status"].Value = Properties.Resources.success;
+                    Invoke(new Action(() =>
+                    {
+                        dataGridView1.Update();
+                        dataGridView1.Refresh();
+                    }));
                     ((Bitmap)item.Cells["Status"].Value).Tag = Constants.OK;
-                    item.Cells["Result"].Value = $"{item.Cells["TOP"].Value}" + RecordsCopied;
+                    item.Cells["Result"].Value = $"{item.Cells["TOP"].Value}{RecordsCopied}";
                 }
                 catch (Exception exc)
                 {
@@ -287,11 +294,11 @@ namespace Sql2SqlCloner
                     item.Cells["Result"].Value = exc.Message;
                     if (exc.InnerException != null && exc.Message != exc.InnerException.Message)
                     {
-                        item.Cells["Result"].Value = exc.Message + ". " + exc.InnerException.Message;
+                        item.Cells["Result"].Value = $"{exc.Message}. {exc.InnerException.Message}";
                     }
                     errorCount++;
                 }
-                backgroundWorker1.ReportProgress((int)((++current) / max * 100.0));
+                progress.Report((int)((++current) / max * 100.0));
             }
             try
             {
@@ -300,27 +307,27 @@ namespace Sql2SqlCloner
             catch (Exception ex)
             {
                 lastError = ex.Message;
-                MessageBox.Show($"Error: {lastError}");
+                Invoke(new Action(() => MessageBox.Show($"Error: {lastError}")));                
                 errorCount++;
             }
             percentage = 100;
-            backgroundWorker1.ReportProgress(100);
+            progress.Report(100);
         }
 
-        private void backgroundWorker1_ProgressChanged(object sender, System.ComponentModel.ProgressChangedEventArgs e)
+        private void ReportProgress(int progressPercentage)
         {
-            lock (inProgress)
+            lock (objLockInProgress)
             {
-                if (progressBar1.Value < 100 && e.ProgressPercentage >= progressBar1.Minimum && e.ProgressPercentage <= progressBar1.Maximum)
+                if (progressBar1.Value < 100 && progressPercentage >= progressBar1.Minimum && progressPercentage <= progressBar1.Maximum)
                 {
-                    percentage = progressBar1.Value = e.ProgressPercentage;
+                    percentage = progressBar1.Value = progressPercentage;
                     if (autoScrollGrid.Checked)
                     {
-                        if (currrow < dataGridView1.RowCount && currrow > 7 && dataGridView1.FirstDisplayedScrollingRowIndex != currrow - 8)
+                        if (currentRow < dataGridView1.RowCount && currentRow > 7 && dataGridView1.FirstDisplayedScrollingRowIndex != currentRow - 8)
                         {
-                            dataGridView1.FirstDisplayedScrollingRowIndex = currrow - 8;
+                            dataGridView1.FirstDisplayedScrollingRowIndex = currentRow - 8;
                         }
-                        else if (currrow < 10)
+                        else if (currentRow < 10)
                         {
                             dataGridView1.Refresh();
                         }
@@ -336,14 +343,14 @@ namespace Sql2SqlCloner
             }
         }
 
-        private void backgroundWorker1_RunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
+        private void RunWorkerCompleted()
         {
-            lock (inProgress)
+            lock (objLockInProgress)
             {
                 btnPause.Enabled = false;
                 stopwatch1.Stop();
                 Timer1.Stop();
-                Timer1_Tick(sender, e);
+                Timer1_Tick(this, EventArgs.Empty);
                 string totalRecs = "";
                 if (errorCount == 0)
                 {
@@ -421,9 +428,9 @@ namespace Sql2SqlCloner
 
         private void btnCancel_Click(object sender, EventArgs e)
         {
-            if (backgroundWorker1.IsBusy)
+            if (cancellationTokenSource != null && !cancellationTokenSource.IsCancellationRequested)
             {
-                backgroundWorker1.CancelAsync();
+                cancellationTokenSource.Cancel();
             }
             Visible = false;
             DialogResult = DialogResult.Abort;

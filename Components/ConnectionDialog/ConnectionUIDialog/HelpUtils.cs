@@ -26,7 +26,7 @@ namespace Microsoft.Data.ConnectionUI
         }
 
         /// <summary>
-        /// This function checks if the OS is 64 bits.
+        /// This function checks if the OS is 64-bit.
         /// </summary>
         public static bool IsWow64()
         {

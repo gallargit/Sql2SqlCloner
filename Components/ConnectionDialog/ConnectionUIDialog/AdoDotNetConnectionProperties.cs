@@ -290,7 +290,7 @@ namespace Microsoft.Data.ConnectionUI
 
         PropertyDescriptorCollection ICustomTypeDescriptor.GetProperties()
         {
-            return GetProperties(new Attribute[0]);
+            return GetProperties(Array.Empty<Attribute>());
         }
 
         PropertyDescriptorCollection ICustomTypeDescriptor.GetProperties(Attribute[] attributes)

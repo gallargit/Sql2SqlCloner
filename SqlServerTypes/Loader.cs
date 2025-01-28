@@ -88,7 +88,7 @@ namespace SqlServerTypes
         {
             if (LoadLibrary(fullAssemblyName) == IntPtr.Zero)
             {
-                throw new Exception(string.Format("Error loading {0} (ErrorCode: {1})", fullAssemblyName, Marshal.GetLastWin32Error()));
+                throw new Exception($"Error loading {fullAssemblyName} (ErrorCode: {Marshal.GetLastWin32Error()})");
             }
         }
     }

@@ -131,12 +131,12 @@ namespace Microsoft.Data.ConnectionUI
         [DllImport("odbccp32.dll", CharSet = CharSet.Unicode)]
         internal static extern int SQLGetPrivateProfileString(string lpszSection, string lpszEntry, string lpszDefault, StringBuilder RetBuffer, int cbRetBuffer, string lpszFilename);
 
-        // Used to check if OS is 64 bits
+        // Used to check if OS is 64-bit
         [DllImport("kernel32")]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool IsWow64Process(IntPtr hProcess, out bool pIsWow64);
 
-        // Used to access 64 bit registry section from 32 bits application
+        // Used to access 64-bit registry section from a 32-bit application
         [DllImport("advapi32")]
         internal static extern int RegOpenKeyEx(UIntPtr hKey, string lpSubKey, int ulOptions, int samDesired, out UIntPtr phkResult);
         [DllImport("advapi32")]

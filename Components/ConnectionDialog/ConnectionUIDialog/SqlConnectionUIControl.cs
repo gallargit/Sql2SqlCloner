@@ -481,7 +481,7 @@ namespace Microsoft.Data.ConnectionUI
             }
             if (selectDatabaseComboBox.Items.Count == 0)
             {
-                var droppedDown = selectDatabaseComboBox.DroppedDown ||
+                droppedDown = selectDatabaseComboBox.DroppedDown ||
                     (e is KeyEventArgs keyEventArgs && keyEventArgs.KeyCode == Keys.Down);
                 selectDatabaseComboBox.Items.Add(loadingItem);
                 if (droppedDown)

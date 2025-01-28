@@ -181,7 +181,7 @@ namespace Sql2SqlCloner
             string DACConnectionString = null;
             if (decryptObjects.Checked && isSchema.Visible)
             {
-                var builder = new SqlConnectionStringBuilder //ojo he cambiado esto y no he probado
+                var builder = new SqlConnectionStringBuilder
                 {
                     ConnectionString = sourceConnection
                 };
@@ -240,7 +240,7 @@ namespace Sql2SqlCloner
                 else
                 {
                     AbortBackgroundTask();
-                    cancelToken = new CancellationToken();
+                    cancelToken = CancellationToken.None;
                     schemaTransfer = new SqlSchemaTransfer(Properties.Settings.Default.SourceServer, Properties.Settings.Default.DestinationServer, false, DACConnectionString, cancelToken);
                     lblPleaseWait.Visible = false;
                 }
@@ -282,7 +282,6 @@ namespace Sql2SqlCloner
                 tskPreload = null;
                 return;
             }
-            var firstStepOk = false;
             if (schemaTransfer.SourceObjects?.Count > 0)
             {
                 var chooseSchema = new ChooseSchemas(schemaTransfer, isData.Checked, isData.Checked && !isSchema.Checked, !isData.Checked && isSchema.Checked, autoRun);
@@ -295,7 +294,6 @@ namespace Sql2SqlCloner
                 }
                 else if (resultdiag == DialogResult.OK)
                 {
-                    firstStepOk = true;
                     if (chooseSchema.SelectedObjects != null)
                     {
                         tablesToCopy = chooseSchema.SelectedObjects.OfType<SqlSchemaTable>().Where(c => c.CopyData).ToList();
@@ -346,7 +344,7 @@ namespace Sql2SqlCloner
                     MessageBox.Show(exc.Message);
                     return;
                 }
-                var copyTableData = new CopyTabledata(tablesToCopy, datatransfer, schemaTransfer, firstStepOk || autoRun,
+                var copyTableData = new CopyTabledata(tablesToCopy, datatransfer, schemaTransfer, autoRun,
                     Properties.Settings.Default.CopyCollation == SqlCollationAction.Set_destination_db_collation,
                     isData.Checked && !isSchema.Checked, isSchema.Checked ? initialTime : (DateTime?)null);
                 copyTableData.Location = new Point(originalLocation.X - ((copyTableData.Width - Width) / 2), originalLocation.Y - ((copyTableData.Height - Height) / 2));

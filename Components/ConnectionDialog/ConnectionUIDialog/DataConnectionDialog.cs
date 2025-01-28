@@ -1379,7 +1379,7 @@ namespace Microsoft.Data.ConnectionUI
                 }
             }
 
-            public string ConnectionString
+            private string ConnectionString
             {
                 get
                 {

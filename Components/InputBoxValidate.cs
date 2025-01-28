@@ -9,8 +9,8 @@ namespace Sql2SqlCloner.Components
 {
     public class InputBoxValidate : Form
     {
-        private readonly Button buttonOk = new Button();
         private readonly Button buttonCancel = new Button();
+        private readonly Button buttonOk = new Button();
         private readonly Label label = new Label();
         private readonly TextBox textBox = new TextBox();
 

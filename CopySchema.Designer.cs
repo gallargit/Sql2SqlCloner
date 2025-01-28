@@ -32,7 +32,6 @@
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
             this.btnNext = new System.Windows.Forms.Button();
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
-            this.backgroundWorker1 = new System.ComponentModel.BackgroundWorker();
             this.label1 = new System.Windows.Forms.Label();
             this.btnCancel = new System.Windows.Forms.Button();
             this.label2 = new System.Windows.Forms.Label();
@@ -192,7 +191,6 @@
 		private System.Windows.Forms.DataGridView dataGridView1;
 		private System.Windows.Forms.Button btnNext;
 		private System.Windows.Forms.ProgressBar progressBar1;
-		private System.ComponentModel.BackgroundWorker backgroundWorker1;
 		private System.Windows.Forms.Label label1;
 		private System.Windows.Forms.Button btnCancel;
 		private System.Windows.Forms.Label label2;

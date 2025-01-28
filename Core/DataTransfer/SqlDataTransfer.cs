@@ -30,8 +30,8 @@ namespace Sql2SqlCloner.Core.DataTransfer
 
         public void EnableAllDestinationConstraints()
         {
-            //enable constraints one by one, this will enable all disabled constraints (which can be enabled)
-            //in a broken database and also remove the untrusted bit in all keys
+            //enable constraints one by one; this will enable all disabled constraints that can be enabled in a
+            //broken database and also will remove the untrusted bit in all keys.
             const string SQLEnableConstraints = @"SELECT 'ALTER TABLE ' + [t].[name] + N' WITH CHECK CHECK CONSTRAINT ' + QUOTENAME([c].[name])
                 FROM sys.tables AS t INNER JOIN sys.check_constraints AS c ON t.[object_id]=c.parent_object_id
                 WHERE c.is_disabled=1
@@ -41,7 +41,7 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 WHERE is_disabled=1 OR is_not_trusted=1";
 
             var finished = false;
-            var incompliantDataDeletion = ConfigurationManager.AppSettings["IncompliantDataDeletion"].ToLowerInvariant();
+            var nonCompliantDataDeletion = ConfigurationManager.AppSettings["NonCompliantDataDeletion"].ToLowerInvariant();
             while (!finished)
             {
                 try
@@ -54,16 +54,16 @@ namespace Sql2SqlCloner.Core.DataTransfer
                 }
                 catch (Exception ex)
                 {
-                    if (incompliantDataDeletion != "true" && incompliantDataDeletion != "false")
+                    if (nonCompliantDataDeletion != "true" && nonCompliantDataDeletion != "false")
                     {
-                        incompliantDataDeletion = MessageBox.Show(
-                        "Could not enable constraints. Delete incompliant data?" + Environment.NewLine + Environment.NewLine +
+                        nonCompliantDataDeletion = MessageBox.Show(
+                        "Could not enable constraints. Delete non-compliant data?" + Environment.NewLine + Environment.NewLine +
                         $"Last error was: {ex.Message}", "Error",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes
                         ? "true"
                         : "false";
                     }
-                    if (Convert.ToBoolean(incompliantDataDeletion))
+                    if (Convert.ToBoolean(nonCompliantDataDeletion))
                     {
                         //delete data which prevents constraints from being enabled
                         DisableAllDestinationConstraints();

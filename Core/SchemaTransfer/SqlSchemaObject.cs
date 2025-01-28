@@ -15,33 +15,21 @@ namespace Sql2SqlCloner.Core.SchemaTransfer
         [System.ComponentModel.Browsable(false)]
         public SqlSchemaObject Parent { get; set; }
         [System.ComponentModel.Browsable(false)]
-        public string NameWithBrackets
-        {
-            get
-            {
-                return AddBrackets(Name);
-            }
-        }
-        [System.ComponentModel.Browsable(false)]
-        public string NameWithoutBrackets
-        {
-            get
-            {
-                return Name.Replace("[", "").Replace("]", "");
-            }
-        }
+        public string NameWithBrackets => AddBrackets(Name);
 
-        public static string AddBrackets(string itemname)
+        [System.ComponentModel.Browsable(false)]
+        public string NameWithoutBrackets => Name.Replace("[", "").Replace("]", "");
+
+        public static string AddBrackets(string itemName)
         {
-            if (string.IsNullOrEmpty(itemname))
+            if (string.IsNullOrEmpty(itemName))
             {
                 return "";
             }
-
-            var nameSplit = itemname.Split('.').ToList();
+            var nameSplit = itemName.Split('.').ToList();
             if (nameSplit.Count < 2)
             {
-                return $"[{itemname}]";
+                return $"[{itemName}]";
             }
             else
             {
